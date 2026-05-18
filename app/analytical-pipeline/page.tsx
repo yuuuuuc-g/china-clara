@@ -1,12 +1,12 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useCompletion } from "@ai-sdk/react";
 import Placeholder from "@tiptap/extension-placeholder";
 import { EditorContent, useEditor } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
-import { ArrowLeft, CheckCircle2, FileEdit, Minimize2, Save, Sparkles, Database, Sun, RotateCcw } from "lucide-react";
+import { ArrowLeft, CheckCircle2, FileEdit, Minimize2, Save, Sparkles, Database, Sun, RotateCcw, X, Plus } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { CyberButton } from "@/src/components/ui/CyberButton";
@@ -14,6 +14,7 @@ import { GlassPanel } from "@/src/components/ui/GlassPanel";
 import { createClient } from "@/src/lib/supabase/client";
 
 type RefineryPhase = "A" | "B" | "C" | "D";
+type WorkbenchView = "cards" | "tags" | "editor";
 
 type PhaseSelections = Record<RefineryPhase, string[]>;
 
@@ -68,7 +69,7 @@ const emptySelectedItems: SelectedItemsByPhase = {
 };
 
 const initialPrompt =
-  "输入一个公共事件、政策争议、市场现象或社会议题，启动认知炼油。";
+  "输入一个公共事件、政策争议、市场现象或社会议题，启动熔炉推演。";
 
 function getNextPhase(phase: RefineryPhase): RefineryPhase | null {
   const currentIndex = phaseOrder.indexOf(phase);
@@ -137,15 +138,39 @@ function parseLabeledLines(block: string): { label: string; value: string }[] {
   });
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function normalizeOptionText(value: unknown): string {
+  if (typeof value === "string") {
+    return value;
+  }
+
+  if (!isRecord(value)) {
+    return "";
+  }
+
+  const title = typeof value.title === "string" ? value.title.trim() : "";
+  const summary = typeof value.summary === "string" ? value.summary.trim() : "";
+
+  return [
+    title ? `标题：${title}` : "",
+    summary ? `摘要：${summary}` : "",
+  ]
+    .filter(Boolean)
+    .join("\n");
+}
+
 /** Join stored option bodies in stable key order (A:0, A:1, …). */
-function joinSelectedItems(items: Record<string, string>): string {
+function joinSelectedItems(items: Record<string, unknown>): string {
   return Object.entries(items)
     .sort(([ka], [kb]) => {
       const ia = Number.parseInt(ka.split(":")[1] ?? "0", 10);
       const ib = Number.parseInt(kb.split(":")[1] ?? "0", 10);
       return ia - ib;
     })
-    .map(([, text]) => text)
+    .map(([, text]) => normalizeOptionText(text))
     .filter(Boolean)
     .join("\n\n---\n\n");
 }
@@ -155,15 +180,18 @@ function buildPhasePrompt({
   sourceText,
   archives,
   selectedItems,
+  customTags,
 }: {
   phase: RefineryPhase;
   sourceText: string;
   archives: Record<"A" | "B" | "C", string>;
   selectedItems: SelectedItemsByPhase;
+  customTags: string[];
 }) {
   const selectedBriefings = joinSelectedItems(selectedItems.A);
   const selectedEvents = joinSelectedItems(selectedItems.B);
   const selectedKeywords = joinSelectedItems(selectedItems.C);
+  const allKeywords = [selectedKeywords, ...customTags].filter(Boolean).join("\n");
 
   if (phase === "A") {
     return `原始议题：\n${sourceText}`;
@@ -177,7 +205,7 @@ function buildPhasePrompt({
     return `原始议题：\n${sourceText}\n\n用户选中的 Briefing（选项原文）：\n${selectedBriefings}\n\nPhase B 完整输出：\n${archives.B}\n\n用户选中的原子事件（选项原文）：\n${selectedEvents}`;
   }
 
-  return `原始议题：\n${sourceText}\n\n用户选中的 Briefing（选项原文）：\n${selectedBriefings}\n\n用户选中的原子事件（选项原文）：\n${selectedEvents}\n\nPhase C 完整输出：\n${archives.C}\n\n用户选中的关键词（选项原文）：\n${selectedKeywords}`;
+  return `原始议题：\n${sourceText}\n\n用户选中的 Briefing（选项原文）：\n${selectedBriefings}\n\n用户选中的原子事件（选项原文）：\n${selectedEvents}\n\nPhase C 完整输出：\n${archives.C}\n\n用户选中的关键词（选项原文）：\n${allKeywords}`;
 }
 
 interface RefineryTipTapDraftProps {
@@ -275,11 +303,21 @@ export default function RefineryPage() {
   const [isEditing, setIsEditing] = useState(false);
   const [editInitialContent, setEditInitialContent] = useState("");
   const [saveStatus, setSaveStatus] = useState<"idle" | "saving" | "saved" | "error">("idle");
+  const [customTags, setCustomTags] = useState<string[]>([]);
+  const [tagInput, setTagInput] = useState("");
 
   const handleEnterEdit = useCallback(() => {
     setEditInitialContent(draftD || completion);
     setIsEditing(true);
   }, [draftD, completion]);
+
+  const phaseHasVisibleWorkbenchOutput =
+    phase !== "D" &&
+    ((pendingPhase === phase && isLoading) || archives[phase].length > 0);
+
+  const isWorkbenchOpen = phase !== "A" || phaseHasVisibleWorkbenchOutput;
+  const workbenchView: WorkbenchView =
+    phase === "D" ? "editor" : phase === "C" ? "tags" : "cards";
 
   const handleSaveDraft = useCallback((html: string) => {
     setDraftD(html);
@@ -322,7 +360,7 @@ export default function RefineryPage() {
           phases: {
             a: { archive: archives.A, selected_items: selectedItems.A },
             b: { archive: archives.B, selected_items: selectedItems.B },
-            c: { archive: archives.C, selected_items: selectedItems.C },
+            c: { archive: archives.C, selected_items: selectedItems.C, custom_tags: customTags },
           },
         });
 
@@ -336,7 +374,7 @@ export default function RefineryPage() {
     } catch {
       setSaveStatus("error");
     }
-  }, [draftD, completion, sourceText, archives, selectedItems]);
+  }, [draftD, completion, sourceText, archives, selectedItems, customTags]);
 
   const leftArchiveText =
     phase === "D"
@@ -367,7 +405,7 @@ export default function RefineryPage() {
     phase === "A"
       ? sourceText.trim().length > 0
       : phase === "D"
-        ? priorSelectedKeysForRun.length > 0 && archives.C.length > 0
+        ? (priorSelectedKeysForRun.length > 0 || customTags.length > 0) && archives.C.length > 0
         : priorSelectedKeysForRun.length > 0 &&
           (phase === "B"
             ? archives.A.length > 0
@@ -417,6 +455,7 @@ export default function RefineryPage() {
       sourceText: sourceText.trim(),
       archives,
       selectedItems,
+      customTags,
     });
 
     setPendingPhase(targetPhase);
@@ -447,6 +486,7 @@ export default function RefineryPage() {
       return;
     }
     setPhase(nextPhase);
+    setIsEditing(false);
     setCompletion("");
   };
 
@@ -458,6 +498,9 @@ export default function RefineryPage() {
     setSelectedItems(emptySelectedItems);
     setPendingPhase(null);
     setCompletion("");
+    setIsEditing(false);
+    setCustomTags([]);
+    setTagInput("");
   };
 
   const showAdvance =
@@ -475,10 +518,10 @@ export default function RefineryPage() {
         <header className="flex flex-col gap-4 border-b border-white/10 pb-5 sm:flex-row sm:items-end sm:justify-between">
           <div>
             <p className="text-xs font-bold tracking-[0.35em] text-[#deff9a]/70">
-              EXOCORTEX REFINERY
+              EXOCORTEX CRUCIBLE
             </p>
             <h1 className="mt-2 font-serif text-3xl tracking-widest text-white sm:text-4xl">
-              Cognitive Refinery
+              The Crucible
             </h1>
           </div>
           <div className="flex flex-col gap-2 sm:flex-row">
@@ -500,12 +543,12 @@ export default function RefineryPage() {
           </div>
         </header>
 
-        <section className="relative flex flex-1 gap-5 transition-all duration-300 ease-in-out">
+        <section className="relative flex flex-1 items-start gap-5 overflow-x-hidden">
           <div
-            className={`flex flex-col gap-5 transition-all duration-300 ease-in-out ${
-              isEditing
-                ? "pointer-events-none absolute -translate-x-full opacity-0"
-                : "relative w-full lg:w-[45%]"
+            className={`sticky top-5 flex flex-col gap-5 self-start transition-all duration-500 ease-in-out ${
+              isWorkbenchOpen
+                ? "w-full lg:w-[38%]"
+                : "w-full max-w-3xl mx-auto"
             }`}
           >
             <GlassPanel className="rounded p-4 sm:p-5">
@@ -516,6 +559,7 @@ export default function RefineryPage() {
                     type="button"
                     onClick={() => {
                       setPhase(p);
+                      setIsEditing(false);
                       if (p !== "D") {
                         setCompletion("");
                       }
@@ -551,7 +595,7 @@ export default function RefineryPage() {
                   <div className="mt-3 space-y-2">
                     {selectedKeys.length > 0 ? (
                       <p className="rounded border border-white/10 bg-white/[0.03] px-4 py-3 text-sm leading-6 text-white/60">
-                        已选择 {selectedKeys.length} 项，继续炼制下一阶段。
+                        已选择 {selectedKeys.length} 项，继续推演下一阶段。
                       </p>
                     ) : (
                       <div className="rounded border border-white/10 bg-white/[0.03] px-4 py-3">
@@ -561,7 +605,9 @@ export default function RefineryPage() {
                         <div className="space-y-2">
                           {priorSelectedKeysForRun.map((key) => {
                             const priorPhase = phase === "B" ? "A" : phase === "C" ? "B" : phase === "D" ? "C" : null;
-                            const itemText = priorPhase ? selectedItems[priorPhase][key] : "";
+                            const itemText = priorPhase
+                              ? normalizeOptionText(selectedItems[priorPhase][key])
+                              : "";
                             return (
                               <div key={key} className="text-sm leading-relaxed text-white/70">
                                 {itemText ? (
@@ -611,7 +657,9 @@ export default function RefineryPage() {
                   <CyberButton
                     variant="secondary"
                     className="min-h-12 flex-1"
-                    disabled={selectedKeys.length === 0 || isLoading}
+                    disabled={
+                      (phase === "C" ? selections.C.length === 0 && customTags.length === 0 : selectedKeys.length === 0) || isLoading
+                    }
                     onClick={advancePhase}
                   >
                     <CheckCircle2 size={16} aria-hidden="true" />
@@ -626,169 +674,273 @@ export default function RefineryPage() {
               )}
             </GlassPanel>
 
-            <GlassPanel className="flex flex-col rounded p-4 sm:p-5">
-              <div className="mb-4 flex items-center justify-between gap-4">
-                <div>
-                  <p className="text-xs font-bold tracking-[0.3em] text-white/35">
-                    SELECTABLE OUTPUT
-                  </p>
-                  <p className="mt-1 text-sm text-white/45">
-                    流式解析 Markdown 列表项，勾选带入下一阶段。
-                  </p>
+            {phase !== "A" && (
+              <GlassPanel className="rounded p-4 sm:p-5">
+                <p className="text-xs font-bold tracking-[0.3em] text-white/35">
+                  SELECTION SUMMARY
+                </p>
+                <div className="mt-3 space-y-2">
+                  {selectedKeys.length > 0 ? (
+                    <p className="text-sm text-white/60">
+                      已选择 {selectedKeys.length} 项，继续推演下一阶段。
+                    </p>
+                  ) : (
+                    <p className="text-sm text-white/40">暂无选中内容</p>
+                  )}
                 </div>
-                <div className="hidden h-2 w-2 rounded-full bg-[#deff9a] shadow-[0_0_18px_rgba(222,255,154,0.75)] sm:block" />
-              </div>
-
-              <div className="flex flex-col gap-3">
-                {phase === "D" && (
-                  <p className="rounded border border-dashed border-white/15 bg-zinc-900/35 px-4 py-6 text-center text-sm text-white/45">
-                    本阶段正文仅在右侧编辑器输出；此处不展示选项卡。
-                  </p>
-                )}
-
-                {phase !== "D" &&
-                  optionBlocks.map((block, index) => {
-                    const key = optionKey(phase, index);
-                    const checked = selectedKeys.includes(key);
-                    const rows = parseLabeledLines(block);
-
-                    return (
-                      <label
-                        key={key}
-                        className={`flex cursor-pointer gap-3 rounded-xl border p-4 text-left transition ${
-                          checked
-                            ? "border-[#deff9a]/55 bg-[#deff9a]/10 shadow-[0_0_0_1px_rgba(222,255,154,0.12)]"
-                            : "border-white/10 bg-zinc-950/50 hover:border-white/25"
-                        }`}
-                      >
-                        <input
-                          type="checkbox"
-                          checked={checked}
-                          onChange={() => toggleSelection(key, block)}
-                          className="mt-1 size-4 shrink-0 rounded border border-white/30 bg-zinc-900 text-[#deff9a] accent-[#deff9a]"
-                        />
-                        <div className="min-w-0 flex-1 space-y-2">
-                          {rows.map((row, rowIndex) =>
-                            row.label ? (
-                              <div key={`${key}-line-${rowIndex}`}>
-                                <p className="text-xs font-semibold tracking-wide text-[#deff9a]/90">
-                                  {row.label}
-                                </p>
-                                <p className="text-sm leading-relaxed text-white/85">
-                                  {row.value || "—"}
-                                </p>
-                              </div>
-                            ) : (
-                              <p
-                                key={`${key}-line-${rowIndex}`}
-                                className="text-sm leading-relaxed text-white/75"
-                              >
-                                {row.value}
-                              </p>
-                            ),
-                          )}
-                        </div>
-                      </label>
-                    );
-                  })}
-              </div>
-            </GlassPanel>
+              </GlassPanel>
+            )}
           </div>
 
-          <GlassPanel
-            className={`relative min-h-[70vh] overflow-hidden rounded p-4 sm:p-5 transition-all duration-300 ease-in-out ${
-              isEditing ? "w-full" : "w-full lg:w-[55%]"
+          <div
+            className={`flex flex-col gap-5 transition-all duration-500 ease-in-out overflow-hidden ${
+              isWorkbenchOpen
+                ? "w-full lg:w-[62%] opacity-100"
+                : "w-0 opacity-0"
             }`}
           >
-            <header className="absolute left-0 right-0 top-0 z-10 border-b border-white/10 bg-zinc-950/90 px-4 pb-4 pt-4 backdrop-blur-sm">
-              <div className="flex items-center justify-between gap-4">
-                <div>
-                  <p className="text-xs font-bold tracking-[0.3em] text-white/35">
-                    DEEP SPACE DRAFT
-                  </p>
-                  <p className="mt-1 text-sm text-white/45">
-                    {isEditing
-                      ? "沉浸式编辑模式"
-                      : phase === "D"
-                        ? "Markdown 阅读视图"
-                        : "TipTap 仅在 Phase D 挂载；A–C 阶段此处休眠。"}
-                  </p>
-                </div>
-                {phase === "D" && !isEditing && !streamingD && (
-                  <div className="flex items-center gap-2">
-                    {saveStatus === "saved" ? (
-                      <>
-                        <button
-                          type="button"
-                          onClick={() => router.push("/")}
-                          className="flex items-center gap-2 rounded border border-[#deff9a]/30 bg-[#deff9a]/10 px-3 py-2 text-xs text-[#deff9a] transition hover:border-[#deff9a]/50 hover:bg-[#deff9a]/20"
-                          title="返回太阳主控台"
-                        >
-                          <Sun size={14} aria-hidden="true" />
-                          <span className="hidden sm:inline">Back to Sun</span>
-                        </button>
-                        <button
-                          type="button"
-                          onClick={resetFlow}
-                          className="flex items-center gap-2 rounded border border-white/10 bg-white/[0.04] px-3 py-2 text-xs text-white/60 transition hover:border-[#deff9a]/40 hover:text-[#deff9a]"
-                          title="开启新分析"
-                        >
-                          <RotateCcw size={14} aria-hidden="true" />
-                          <span className="hidden sm:inline">New Session</span>
-                        </button>
-                      </>
-                    ) : (
-                      <>
-                        <button
-                          type="button"
-                          onClick={handlePersistToDatabase}
-                          disabled={saveStatus === "saving"}
-                          className={`flex items-center gap-2 rounded border px-3 py-2 text-xs transition ${
-                            saveStatus === "error"
-                              ? "border-red-500/30 bg-red-500/10 text-red-400"
-                              : "border-white/10 bg-white/[0.04] text-white/60 hover:border-[#deff9a]/40 hover:text-[#deff9a]"
-                          }`}
-                          title="保存到数据库"
-                        >
-                          <Database size={14} aria-hidden="true" />
-                          <span className="hidden sm:inline">
-                            {saveStatus === "saving" ? "Saving..." : saveStatus === "error" ? "Retry" : "Save to Archive"}
-                          </span>
-                        </button>
-                        <button
-                          type="button"
-                          onClick={handleEnterEdit}
-                          className="flex items-center gap-2 rounded border border-white/10 bg-white/[0.04] px-3 py-2 text-xs text-white/60 transition hover:border-[#deff9a]/40 hover:text-[#deff9a]"
-                          title="进入编辑模式"
-                        >
-                          <FileEdit size={14} aria-hidden="true" />
-                          <span className="hidden sm:inline">编辑文档</span>
-                        </button>
-                      </>
+            {isWorkbenchOpen && (
+              <GlassPanel className="relative flex flex-1 min-h-[70vh] overflow-hidden rounded p-4 sm:p-5">
+                <header className="absolute left-0 right-0 top-0 z-10 border-b border-white/10 bg-zinc-950/90 px-4 pb-4 pt-4 backdrop-blur-sm">
+                  <div className="flex items-center justify-between gap-4">
+                    <div>
+                      <p className="text-xs font-bold tracking-[0.3em] text-white/35">
+                        {phase === "A" && "BRIEFING CANDIDATES"}
+                        {phase === "B" && "DIMENSIONAL ANALYSIS"}
+                        {phase === "C" && "CONCEPT REFINERY"}
+                        {phase === "D" && "DEEP SPACE DRAFT"}
+                      </p>
+                      <p className="mt-1 text-sm text-white/45">
+                        {phase === "A" && "Select briefings to continue"}
+                        {phase === "B" && "Select atomic events to build your chain"}
+                        {phase === "C" && "Curate and refine core concepts"}
+                        {phase === "D" && (isEditing ? "沉浸式编辑模式" : "Markdown 阅读视图")}
+                      </p>
+                    </div>
+                    {phase === "D" && !isEditing && !streamingD && (
+                      <div className="flex items-center gap-2">
+                        {saveStatus === "saved" ? (
+                          <>
+                            <button
+                              type="button"
+                              onClick={() => router.push("/")}
+                              className="flex items-center gap-2 rounded border border-[#deff9a]/30 bg-[#deff9a]/10 px-3 py-2 text-xs text-[#deff9a] transition hover:border-[#deff9a]/50 hover:bg-[#deff9a]/20"
+                              title="返回太阳主控台"
+                            >
+                              <Sun size={14} aria-hidden="true" />
+                              <span className="hidden sm:inline">Back to Sun</span>
+                            </button>
+                            <button
+                              type="button"
+                              onClick={resetFlow}
+                              className="flex items-center gap-2 rounded border border-white/10 bg-white/[0.04] px-3 py-2 text-xs text-white/60 transition hover:border-[#deff9a]/40 hover:text-[#deff9a]"
+                              title="开启新分析"
+                            >
+                              <RotateCcw size={14} aria-hidden="true" />
+                              <span className="hidden sm:inline">New Session</span>
+                            </button>
+                          </>
+                        ) : (
+                          <>
+                            <button
+                              type="button"
+                              onClick={handlePersistToDatabase}
+                              disabled={saveStatus === "saving"}
+                              className={`flex items-center gap-2 rounded border px-3 py-2 text-xs transition ${
+                                saveStatus === "error"
+                                  ? "border-red-500/30 bg-red-500/10 text-red-400"
+                                  : "border-white/10 bg-white/[0.04] text-white/60 hover:border-[#deff9a]/40 hover:text-[#deff9a]"
+                              }`}
+                              title="保存到数据库"
+                            >
+                              <Database size={14} aria-hidden="true" />
+                              <span className="hidden sm:inline">
+                                {saveStatus === "saving" ? "Saving..." : saveStatus === "error" ? "Retry" : "Save to Archive"}
+                              </span>
+                            </button>
+                            <button
+                              type="button"
+                              onClick={handleEnterEdit}
+                              className="flex items-center gap-2 rounded border border-white/10 bg-white/[0.04] px-3 py-2 text-xs text-white/60 transition hover:border-[#deff9a]/40 hover:text-[#deff9a]"
+                              title="进入编辑模式"
+                            >
+                              <FileEdit size={14} aria-hidden="true" />
+                              <span className="hidden sm:inline">编辑文档</span>
+                            </button>
+                          </>
+                        )}
+                      </div>
                     )}
                   </div>
-                )}
-              </div>
-            </header>
+                </header>
 
-            <div className="absolute inset-x-0 bottom-0 top-[5.75rem] overflow-y-auto rounded-lg border border-white/5 bg-zinc-900/50">
-              {phase === "D" ? (
-                isEditing ? (
-                  <RefineryTipTapDraft
-                    initialContent={editInitialContent}
-                    onSave={handleSaveDraft}
-                    onCancel={handleCancelEdit}
-                  />
-                ) : (
-                  <RefineryMarkdownPreview text={streamingD ? completion : draftD} />
-                )
-              ) : (
-                <div className="flex min-h-[48vh] items-center justify-center p-6 text-center text-sm leading-6 text-white/35">
-                  非 Phase D：编辑器未挂载，流式内容只在左侧解析。
+                <div className="absolute inset-x-0 bottom-0 top-[5.75rem] overflow-y-auto rounded-lg border border-white/5 bg-zinc-900/50">
+                  {(phase === "A" || phase === "B") && workbenchView === "cards" && (
+                    <div className="flex flex-col gap-3 p-4">
+                      {optionBlocks.map((block, index) => {
+                        const key = optionKey(phase, index);
+                        const checked = selectedKeys.includes(key);
+                        const optionText = normalizeOptionText(block);
+                        const rows = parseLabeledLines(optionText);
+
+                        return (
+                          <label
+                            key={key}
+                            className={`flex cursor-pointer gap-3 rounded-xl border p-4 text-left transition ${
+                              checked
+                                ? "border-[#deff9a]/55 bg-[#deff9a]/10 shadow-[0_0_0_1px_rgba(222,255,154,0.12)]"
+                                : "border-white/10 bg-zinc-950/50 hover:border-white/25"
+                            }`}
+                          >
+                            <input
+                              type="checkbox"
+                              checked={checked}
+                              onChange={() => toggleSelection(key, optionText)}
+                              className="mt-1 size-4 shrink-0 rounded border border-white/30 bg-zinc-900 text-[#deff9a] accent-[#deff9a]"
+                            />
+                            <div className="min-w-0 flex-1 space-y-2">
+                              {rows.map((row, rowIndex) =>
+                                row.label ? (
+                                  <div key={`${key}-line-${rowIndex}`}>
+                                    <p className="text-xs font-semibold tracking-wide text-[#deff9a]/90">
+                                      {row.label}
+                                    </p>
+                                    <p className="text-sm leading-relaxed text-white/85">
+                                      {row.value || "—"}
+                                    </p>
+                                  </div>
+                                ) : (
+                                  <p
+                                    key={`${key}-line-${rowIndex}`}
+                                    className="text-sm leading-relaxed text-white/75"
+                                  >
+                                    {row.value}
+                                  </p>
+                                ),
+                              )}
+                            </div>
+                          </label>
+                        );
+                      })}
+                    </div>
+                  )}
+
+                  {phase === "C" && workbenchView === "tags" && (
+                    <div className="flex flex-col gap-4 p-4">
+                      <div className="flex flex-wrap gap-2">
+                        {optionBlocks.map((block, index) => {
+                          const key = optionKey(phase, index);
+                          const checked = selectedKeys.includes(key);
+                          const optionText = normalizeOptionText(block);
+                          return (
+                            <button
+                              key={key}
+                              type="button"
+                              onClick={() => toggleSelection(key, optionText)}
+                              className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-sm transition ${
+                                checked
+                                  ? "border-[#deff9a]/55 bg-[#deff9a]/10 text-[#deff9a] shadow-[0_0_0_1px_rgba(222,255,154,0.12)]"
+                                  : "border-white/10 bg-zinc-950/50 text-white/60 hover:border-white/25 hover:text-white/80"
+                              }`}
+                            >
+                              <span className="max-w-[200px] truncate">{optionText.slice(0, 40)}{optionText.length > 40 ? "..." : ""}</span>
+                              {checked && <CheckCircle2 size={12} className="shrink-0" />}
+                            </button>
+                          );
+                        })}
+                      </div>
+
+                      <div className="flex flex-wrap gap-2">
+                        {selections.C.map((key) => {
+                          const text = normalizeOptionText(selectedItems.C[key]);
+                          if (!text) return null;
+                          return (
+                            <span
+                              key={key}
+                              className="inline-flex items-center gap-1.5 rounded-full border border-[#deff9a]/55 bg-[#deff9a]/10 px-3 py-1.5 text-sm text-[#deff9a]"
+                            >
+                              <span className="max-w-[200px] truncate">{text.slice(0, 30)}{text.length > 30 ? "..." : ""}</span>
+                              <button
+                                type="button"
+                                onClick={() => toggleSelection(key, text)}
+                                className="ml-0.5 rounded-full p-0.5 text-[#deff9a]/70 transition hover:bg-[#deff9a]/20 hover:text-[#deff9a]"
+                              >
+                                <X size={12} />
+                              </button>
+                            </span>
+                          );
+                        })}
+                        {customTags.map((tag) => (
+                          <span
+                            key={`custom-${tag}`}
+                            className="inline-flex items-center gap-1.5 rounded-full border border-[#deff9a]/30 bg-[#deff9a]/5 px-3 py-1.5 text-sm text-[#deff9a]/90"
+                          >
+                            <span className="max-w-[200px] truncate">{tag}</span>
+                            <button
+                              type="button"
+                              onClick={() => setCustomTags((prev) => prev.filter((t) => t !== tag))}
+                              className="ml-0.5 rounded-full p-0.5 text-[#deff9a]/60 transition hover:bg-[#deff9a]/15 hover:text-[#deff9a]"
+                            >
+                              <X size={12} />
+                            </button>
+                          </span>
+                        ))}
+                      </div>
+
+                      <div className="flex gap-2">
+                        <input
+                          type="text"
+                          value={tagInput}
+                          onChange={(e) => setTagInput(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter" && tagInput.trim()) {
+                              e.preventDefault();
+                              const newTag = tagInput.trim();
+                              if (!customTags.includes(newTag) && !Object.values(selectedItems.C).includes(newTag)) {
+                                setCustomTags((prev) => [...prev, newTag]);
+                              }
+                              setTagInput("");
+                            }
+                          }}
+                          placeholder="添加 AI 遗漏的核心概念..."
+                          className="flex-1 rounded border border-white/10 bg-white/[0.04] px-3 py-2 text-sm text-white outline-none transition placeholder:text-white/30 focus:border-[#deff9a]/50 focus:bg-white/[0.06]"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (tagInput.trim()) {
+                              const newTag = tagInput.trim();
+                              if (!customTags.includes(newTag) && !Object.values(selectedItems.C).includes(newTag)) {
+                                setCustomTags((prev) => [...prev, newTag]);
+                              }
+                              setTagInput("");
+                            }
+                          }}
+                          disabled={!tagInput.trim()}
+                          className="inline-flex items-center gap-1.5 rounded border border-[#deff9a]/30 bg-[#deff9a]/10 px-3 py-2 text-sm text-[#deff9a] transition hover:border-[#deff9a]/50 hover:bg-[#deff9a]/20 disabled:opacity-40"
+                        >
+                          <Plus size={14} />
+                          Add
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
+                  {workbenchView === "editor" && (
+                    isEditing ? (
+                      <RefineryTipTapDraft
+                        initialContent={editInitialContent}
+                        onSave={handleSaveDraft}
+                        onCancel={handleCancelEdit}
+                      />
+                    ) : (
+                      <RefineryMarkdownPreview text={streamingD ? completion : draftD} />
+                    )
+                  )}
                 </div>
-              )}
-            </div>
-          </GlassPanel>
+              </GlassPanel>
+            )}
+          </div>
         </section>
       </div>
     </main>
