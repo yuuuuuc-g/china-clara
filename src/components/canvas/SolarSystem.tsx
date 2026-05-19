@@ -79,7 +79,7 @@ const PLANETS: PlanetConfig[] = [
     type: "Gas Giant",
     gravity: "24.79 m/s²",
     mass: "1.90 × 10²⁷ kg",
-    description: "The largest planet in our solar system, a gas giant known for its iconic Great Red Spot—a massive storm larger than Earth—and dozens of orbiting moons."
+    description: "The Nexus functions as a dynamic topological indexing map. Through the semantic analysis of shared keywords, it autonomously establishes logical vectors between discrete informational islands, transmuting linear consumption into a networked cognitive emergence. Within this space, knowledge ceases to be isolated archival entries; it becomes an interwoven, symbiotic matrix designed to illuminate the convergence and divergence of underlying logic."
   },
   {
     name: "Saturn",

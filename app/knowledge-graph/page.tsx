@@ -138,7 +138,7 @@ export default async function KnowledgeGraphPage() {
         <header className="flex flex-col gap-4 border-b border-white/10 pb-6 sm:flex-row sm:items-end sm:justify-between">
           <div>
             <p className="text-xs font-bold tracking-[0.35em] text-[#deff9a]/70">
-              THE NEXUS
+              A SPACE
             </p>
             <h1 className="mt-2 font-serif text-4xl tracking-widest text-white">
               THE NEXUS
@@ -152,13 +152,13 @@ export default async function KnowledgeGraphPage() {
             className="inline-flex min-h-11 items-center justify-center gap-2 rounded border border-white/10 bg-white/[0.04] px-4 text-sm font-semibold tracking-wide text-white/70 transition hover:border-[#deff9a]/40 hover:text-[#deff9a]"
           >
             <ArrowLeft size={16} aria-hidden="true" />
-            返回星系
+            BACK
           </Link>
         </header>
 
         <div className="relative">
           <NexusGraphCanvas graphData={graphData} />
-          <div className="pointer-events-none absolute bottom-5 left-5 font-mono text-xs uppercase tracking-[0.28em] text-[#deff9a]">
+          <div className="pointer-events-none absolute bottom-8 left-5 font-mono text-xs uppercase tracking-[0.28em] text-[#deff9a]">
             <p>Documents {data?.length ?? 0}</p>
             <p className="mt-1">Nodes {graphData.nodes.length}</p>
             <p className="mt-1">Links {graphData.links.length}</p>

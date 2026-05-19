@@ -69,7 +69,7 @@ const emptySelectedItems: SelectedItemsByPhase = {
 };
 
 const initialPrompt =
-  "输入一个公共事件、政策争议、市场现象或社会议题，启动熔炉推演。";
+  "输入一个公共事件、政策争议、市场现象或社会议题，启动推演。";
 
 function getNextPhase(phase: RefineryPhase): RefineryPhase | null {
   const currentIndex = phaseOrder.indexOf(phase);
