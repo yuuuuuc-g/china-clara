@@ -19,12 +19,30 @@ A persisted piece of content in Markdown format, stored in the central Archive. 
 **Archive**:
 The central document repository (Earth module) where all generated content is aggregated and browsable.
 
+**Exocortex**:
+An externalised knowledge workspace that lets the user retrieve, inspect, and navigate previously ingested knowledge.
+
+**Retrieval**:
+A search interaction that turns a user question into ranked knowledge fragments from the Exocortex.
+
+**Search Result**:
+A ranked knowledge fragment returned by a Retrieval. It carries enough source context for the user to evaluate where the fragment came from.
+
+**Hit@1**:
+The highest-ranked Search Result for a Retrieval.
+
+**Generation**:
+An answer synthesis step that uses the user's question and Search Results to produce a grounded natural-language response.
+
 ## Relationships
 
 - A **Planet** provides access to exactly one **Module**
 - A **Module** can produce multiple **Documents**
 - An **Analytical Session** generates exactly one **Document**
 - A **Document** belongs to exactly one **Module** (via `source_module`)
+- A **Retrieval** can return multiple **Search Results**
+- A **Hit@1** belongs to exactly one **Retrieval**
+- A **Generation** is grounded in one **Retrieval**
 
 ## Example dialogue
 

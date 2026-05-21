@@ -1,0 +1,5 @@
+EbookLib>=0.18
+beautifulsoup4>=4.12
+openai>=1.0
+supabase>=2.0
+python-dotenv>=1.0
