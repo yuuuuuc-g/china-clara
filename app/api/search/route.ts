@@ -1,9 +1,10 @@
 import OpenAI from "openai";
 import { createClient } from "@supabase/supabase-js";
 
-const OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1";
-const EMBEDDING_MODEL = "openai/text-embedding-3-small";
-const QUERY_REWRITE_MODEL = "openai/gpt-4o-mini";
+const GEMINI_BASE_URL = "https://generativelanguage.googleapis.com/v1beta/openai/";
+const SILICONFLOW_BASE_URL = "https://api.siliconflow.cn/v1";
+const EMBEDDING_MODEL = "BAAI/bge-m3";
+const QUERY_REWRITE_MODEL = "gemini-1.5-flash";
 const MATCH_COUNT = 3;
 const QUERY_REWRITE_TIMEOUT_MS = 4_000;
 const QUERY_REWRITE_SYSTEM_PROMPT =
@@ -112,14 +113,14 @@ function logQueryRewrite(originalQuery: string, rewrittenQuery: string): void {
   );
 }
 
-async function rewriteQuery(openai: OpenAI, query: string): Promise<string> {
+async function rewriteQuery(llmClient: OpenAI, query: string): Promise<string> {
   const abortController = new AbortController();
   const timeoutId: ReturnType<typeof setTimeout> = setTimeout(() => {
     abortController.abort();
   }, QUERY_REWRITE_TIMEOUT_MS);
 
   try {
-    const completion = await openai.chat.completions.create(
+    const completion = await llmClient.chat.completions.create(
       {
         model: QUERY_REWRITE_MODEL,
         messages: [
@@ -158,12 +159,14 @@ export async function POST(request: Request) {
     return jsonError("bookUuid must be a valid UUID when provided.", 400);
   }
 
-  let openrouterApiKey: string;
+  let siliconFlowApiKey: string;
+  let geminiApiKey: string;
   let supabaseUrl: string;
   let supabaseKey: string;
 
   try {
-    openrouterApiKey = getRequiredEnv("OPENROUTER_API_KEY");
+    siliconFlowApiKey = getRequiredEnv("SILICONFLOW_API_KEY");
+    geminiApiKey = getRequiredEnv("GEMINI_API_KEY");
     supabaseUrl = getRequiredEnv("SUPABASE_URL");
     supabaseKey = getRequiredEnv("SUPABASE_KEY");
   } catch (error) {
@@ -172,15 +175,19 @@ export async function POST(request: Request) {
   }
 
   try {
-    const openai = new OpenAI({
-      apiKey: openrouterApiKey,
-      baseURL: OPENROUTER_BASE_URL,
+    const llmClient = new OpenAI({
+      apiKey: geminiApiKey,
+      baseURL: GEMINI_BASE_URL,
+    });
+    const embeddingClient = new OpenAI({
+      apiKey: siliconFlowApiKey,
+      baseURL: SILICONFLOW_BASE_URL,
     });
     const supabase = createClient(supabaseUrl, supabaseKey);
-    const rewrittenQuery = await rewriteQuery(openai, query);
+    const rewrittenQuery = await rewriteQuery(llmClient, query);
     logQueryRewrite(query, rewrittenQuery);
 
-    const embeddingResponse = await openai.embeddings.create({
+    const embeddingResponse = await embeddingClient.embeddings.create({
       model: EMBEDDING_MODEL,
       input: rewrittenQuery,
     });
