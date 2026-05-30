@@ -50,3 +50,5 @@ __pycache__/
 
 # local RAG artifacts
 rag-pipeline/*.epub/
+
+ctx2skill-loop.ts

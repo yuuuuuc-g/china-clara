@@ -5,7 +5,7 @@ import { Planet } from "./Planet";
 import { EarthMoonSystem } from "./EarthMoonSystem"; 
 import type { PlanetConfig } from "./types";
 
-const PLANETS: PlanetConfig[] = [
+export const PLANETS: PlanetConfig[] = [
   {
     name: "Mercury",
     size: 0.4,
@@ -69,13 +69,9 @@ const PLANETS: PlanetConfig[] = [
     orbitSpeed: 0.2,
     rotationSpeed: 2.0,
     color: "#d4a373",
-    hasRing: true,
-    ringInnerRadius: 1.4,
-    ringOuterRadius: 2.2,
     label: "Knowledge Graph",
     module: "knowledge-graph",
     textureUrl: "/textures/2k_jupiter.jpg",
-    ringTextureUrl: "/textures/2k_jupiter_ring_alpha.png", 
     type: "Gas Giant",
     gravity: "24.79 m/s²",
     mass: "1.90 × 10²⁷ kg",

@@ -28,7 +28,6 @@ export function Planet({ config }: PlanetProps) {
     // ✨ 1. 结构出偏心率参数（如果配置里没写，就默认是 0，即正圆）
     eccentricity = 0, 
   } = config; // 这里暂用 as any 防止 types.ts 还没加上 eccentricity 报错
-
   const texture = useMemo(() => {
     if (!textureUrl) return null;
     const tex = new THREE.TextureLoader().load(textureUrl);
@@ -95,6 +94,7 @@ export function Planet({ config }: PlanetProps) {
       groupRef.current.position.x = Math.cos(angleRef.current) * a - focalShift;
       groupRef.current.position.z = Math.sin(angleRef.current) * b;
     }
+
   });
 
   const handleClick = useCallback((e: { stopPropagation: () => void }) => {

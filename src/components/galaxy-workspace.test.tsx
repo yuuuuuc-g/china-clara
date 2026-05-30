@@ -121,6 +121,18 @@ describe("GalaxyWorkspace", () => {
     });
   }
 
+  type SseEvent = {
+    event: string;
+    data: Record<string, unknown>;
+  };
+
+  function sseStream(events: SseEvent[]): ReadableStream<Uint8Array> {
+    const parts = events.map(
+      (event) => `event: ${event.event}\ndata: ${JSON.stringify(event.data)}\n\n`
+    );
+    return textStream(parts);
+  }
+
   it("keeps the Canvas layer at z-0 and the HUD layer at z-10", () => {
     renderGalaxyWorkspace();
 
@@ -144,7 +156,7 @@ describe("GalaxyWorkspace", () => {
     expect(container.textContent).toContain("Enter a question to search the Exocortex.");
   });
 
-  it("loads nodes on mount and sends Hit@1 id into GalaxyNodes after search", async () => {
+  it("loads nodes on mount, consumes agent SSE, and renders HUD logs/results", async () => {
     const fetchMock = vi.fn((url: string) => {
       if (url === "/api/nodes") {
         return Promise.resolve({
@@ -160,50 +172,95 @@ describe("GalaxyWorkspace", () => {
       }
 
       if (url === "/api/search") {
-        return Promise.resolve({
-          ok: true,
-          json: async () => ({
-            results: [
+        return Promise.resolve(
+          new Response(
+            sseStream([
               {
-                id: "chunk-2",
-                content: "专业化依赖可预期规则。",
-                chapter_title: "分工",
-                similarity: 0.82,
-                chapter_index: 5,
-                chunk_index: 1,
+                event: "agent_started",
+                data: { query: "规则如何促进合作？", rewrittenQuery: "规则 制度 Institutions 产权" },
               },
               {
-                id: "chunk-3",
-                content: "产权界定冲突边界。",
-                chapter_title: "产权",
-                similarity: 0.73,
-                chapter_index: 6,
-                chunk_index: 7,
+                event: "tool_call_started",
+                data: {
+                  iteration: 1,
+                  toolCallId: "call_1",
+                  toolName: "hybrid_search",
+                  query: "制度经济学",
+                },
               },
               {
-                id: "chunk-4",
-                content: "This should not render.",
-                chapter_title: "Overflow",
-                similarity: 0.4,
-                chapter_index: 7,
-                chunk_index: 1,
+                event: "tool_call_result",
+                data: {
+                  iteration: 1,
+                  toolCallId: "call_1",
+                  results: [
+                    {
+                      id: "chunk-2",
+                      content: "专业化依赖可预期规则。",
+                      chapter_title: "分工",
+                      similarity: 0.82,
+                      chapter_index: 5,
+                      chunk_index: 1,
+                    },
+                    {
+                      id: "chunk-3",
+                      content: "产权界定冲突边界。",
+                      chapter_title: "产权",
+                      similarity: 0.73,
+                      chapter_index: 6,
+                      chunk_index: 7,
+                    },
+                    {
+                      id: "chunk-4",
+                      content: "This should not render.",
+                      chapter_title: "Overflow",
+                      similarity: 0.4,
+                      chapter_index: 7,
+                      chunk_index: 1,
+                    },
+                    {
+                      id: "chunk-5",
+                      content: "Fourth result should not render.",
+                      chapter_title: "Overflow 2",
+                      similarity: 0.3,
+                      chapter_index: 8,
+                      chunk_index: 1,
+                    },
+                  ],
+                },
               },
               {
-                id: "chunk-5",
-                content: "Fourth result should not render.",
-                chapter_title: "Overflow 2",
-                similarity: 0.3,
-                chapter_index: 8,
-                chunk_index: 1,
+                event: "iteration_summary",
+                data: { iteration: 1, continueReason: "model_requested_tool" },
               },
-            ],
-          }),
-        });
+              {
+                event: "model_delta",
+                data: { iteration: 2, delta: "制度" },
+              },
+              {
+                event: "model_delta",
+                data: { iteration: 2, delta: "降低交易成本" },
+              },
+              {
+                event: "agent_finished",
+                data: { totalIterations: 2 },
+              },
+            ]),
+            {
+              status: 200,
+              headers: { "Content-Type": "text/event-stream" },
+            }
+          )
+        );
       }
 
-      return Promise.resolve(new Response(textStream(["制度", "降低", "交易成本"]), {
-        status: 200,
-      }));
+      if (url === "/api/chat") {
+        return Promise.resolve({
+          ok: true,
+          text: async () => "",
+        });
+      }
+      return Promise.resolve({ ok: false, json: async () => ({ error: "unknown endpoint" }) });
     });
     vi.stubGlobal("fetch", fetchMock);
     renderGalaxyWorkspace();
@@ -246,25 +303,19 @@ describe("GalaxyWorkspace", () => {
 
       expect(resultsPanel.querySelectorAll("article")).toHaveLength(3);
       expect(resultsPanel.textContent).not.toContain("Fourth result should not render.");
+      expect(resultsPanel.textContent).toContain("Source: 分工");
       expect(getByTestId("galaxy-nodes").getAttribute("data-highlighted-node-id")).toBe(
         "chunk-2"
       );
     });
 
     await waitForExpectation(() => {
-      expect(fetchMock).toHaveBeenCalledWith("/api/chat", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          query: "规则如何促进合作？",
-          references: [
-            { content: "专业化依赖可预期规则。" },
-            { content: "产权界定冲突边界。" },
-            { content: "This should not render." },
-          ],
-        }),
-      });
+      expect(fetchMock).not.toHaveBeenCalledWith(
+        "/api/chat",
+        expect.objectContaining({ method: "POST" })
+      );
       expect(getByTestId("ai-response").textContent).toContain("制度降低交易成本");
+      expect(container.querySelector("[data-testid=\"agent-logs\"]")).toBeNull();
     });
   });
 });

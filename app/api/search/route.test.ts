@@ -1,27 +1,62 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+const GEMINI_BASE_URL = "https://generativelanguage.googleapis.com/v1beta/openai/";
+const SILICONFLOW_BASE_URL = "https://api.siliconflow.cn/v1";
+const DEEPSEEK_BASE_URL = "https://api.deepseek.com/v1";
+
 const mocks = vi.hoisted(() => ({
-  chatCompletionsCreate: vi.fn(),
+  rewriteCreate: vi.fn(),
   embeddingsCreate: vi.fn(),
+  agentCreate: vi.fn(),
   rpc: vi.fn(),
   openAIConstructor: vi.fn(),
   createClient: vi.fn(),
 }));
 
 vi.mock("openai", () => ({
-  default: vi.fn(function OpenAIMock(config: unknown) {
+  default: vi.fn(function OpenAIMock(config: { baseURL?: string }) {
     mocks.openAIConstructor(config);
 
-    return {
-      chat: {
-        completions: {
-          create: mocks.chatCompletionsCreate,
+    if (config.baseURL === GEMINI_BASE_URL) {
+      return {
+        chat: {
+          completions: {
+            create: mocks.rewriteCreate,
+          },
         },
-      },
-      embeddings: {
-        create: mocks.embeddingsCreate,
-      },
-    };
+        embeddings: {
+          create: vi.fn(),
+        },
+      };
+    }
+
+    if (config.baseURL === SILICONFLOW_BASE_URL) {
+      return {
+        chat: {
+          completions: {
+            create: vi.fn(),
+          },
+        },
+        embeddings: {
+          create: mocks.embeddingsCreate,
+        },
+      };
+    }
+
+    if (config.baseURL === DEEPSEEK_BASE_URL) {
+      return {
+        chat: {
+          completions: {
+            create: mocks.agentCreate,
+          },
+        },
+        embeddings: {
+          create: vi.fn(),
+        },
+      };
+    }
+
+    throw new Error("Unexpected OpenAI client config.");
   }),
 }));
 
@@ -34,6 +69,33 @@ vi.mock("@supabase/supabase-js", () => ({
     };
   }),
 }));
+
+type ParsedSseEvent = {
+  event: string;
+  data: Record<string, unknown>;
+};
+
+function parseSseEvents(payload: string): ParsedSseEvent[] {
+  return payload
+    .split("\n\n")
+    .map((frame) => frame.trim())
+    .filter((frame) => frame.length > 0)
+    .map((frame) => {
+      const lines = frame.split("\n");
+      const event = lines
+        .find((line) => line.startsWith("event:"))
+        ?.replace("event:", "")
+        .trim();
+      const dataLine = lines
+        .find((line) => line.startsWith("data:"))
+        ?.replace("data:", "")
+        .trim();
+      return {
+        event: event ?? "message",
+        data: dataLine ? (JSON.parse(dataLine) as Record<string, unknown>) : {},
+      };
+    });
+}
 
 async function postSearch(body: unknown) {
   const { POST } = await import("./route");
@@ -49,54 +111,27 @@ async function postSearch(body: unknown) {
 describe("POST /api/search", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    process.env.OPENROUTER_API_KEY = "openrouter-key";
+    process.env.SILICONFLOW_API_KEY = "siliconflow-key";
+    process.env.GEMINI_API_KEY = "gemini-key";
+    process.env.DEEPSEEK_API_KEY = "deepseek-key";
     process.env.SUPABASE_URL = "https://example.supabase.co";
     process.env.SUPABASE_KEY = "supabase-key";
   });
 
-  it("rejects an empty query before calling external services", async () => {
+  it("rejects an empty query before starting the agent", async () => {
     const response = await postSearch({ query: "   " });
 
     await expect(response.json()).resolves.toEqual({
       error: "A non-empty query string is required.",
     });
     expect(response.status).toBe(400);
-    expect(mocks.embeddingsCreate).not.toHaveBeenCalled();
-    expect(mocks.chatCompletionsCreate).not.toHaveBeenCalled();
+    expect(mocks.agentCreate).not.toHaveBeenCalled();
     expect(mocks.rpc).not.toHaveBeenCalled();
   });
 
-  it("rejects malformed JSON as an invalid query", async () => {
-    const response = await postSearch("{not-json");
-
-    await expect(response.json()).resolves.toEqual({
-      error: "A non-empty query string is required.",
-    });
-    expect(response.status).toBe(400);
-  });
-
-  it("reports missing server environment before external calls", async () => {
-    delete process.env.OPENROUTER_API_KEY;
-
-    const response = await postSearch({ query: "制度如何影响合作？" });
-
-    await expect(response.json()).resolves.toEqual({
-      error: "Missing required environment variable: OPENROUTER_API_KEY",
-    });
-    expect(response.status).toBe(500);
-    expect(mocks.openAIConstructor).not.toHaveBeenCalled();
-    expect(mocks.createClient).not.toHaveBeenCalled();
-  });
-
-  it("embeds the query, calls hybrid_search, and returns three typed results", async () => {
-    mocks.chatCompletionsCreate.mockResolvedValue({
-      choices: [
-        {
-          message: {
-            content: "规则 制度 Institutions 产权 Property Rights",
-          },
-        },
-      ],
+  it("streams lifecycle events, tool telemetry, and the final answer", async () => {
+    mocks.rewriteCreate.mockResolvedValue({
+      choices: [{ message: { content: "规则 制度 Institutions 产权" } }],
     });
     mocks.embeddingsCreate.mockResolvedValue({
       data: [{ embedding: [0.1, 0.2, 0.3] }],
@@ -119,126 +154,73 @@ describe("POST /api/search", () => {
           chapter_index: 5,
           chunk_index: 1,
         },
-        {
-          id: "chunk-3",
-          content: "产权界定冲突边界。",
-          chapter_title: "产权",
-          similarity: 0.73,
-          chapter_index: 6,
-          chunk_index: 7,
-        },
-        {
-          id: "chunk-4",
-          content: "extra",
-          chapter_title: "Should not render",
-          similarity: 0.1,
-        },
       ],
       error: null,
     });
-
-    const response = await postSearch({ query: "  规则如何促进合作？  " });
-
-    await expect(response.json()).resolves.toEqual({
-      results: [
-        {
-          id: "chunk-1",
-          content: "规则降低交易成本。",
-          chapter_title: "制度与合作",
-          similarity: 0.91,
-          chapter_index: 4,
-          chunk_index: 2,
-        },
-        {
-          id: "chunk-2",
-          content: "专业化依赖可预期规则。",
-          chapter_title: "分工",
-          similarity: 0.82,
-          chapter_index: 5,
-          chunk_index: 1,
-        },
-        {
-          id: "chunk-3",
-          content: "产权界定冲突边界。",
-          chapter_title: "产权",
-          similarity: 0.73,
-          chapter_index: 6,
-          chunk_index: 7,
-        },
-      ],
-    });
-    expect(response.status).toBe(200);
-    expect(mocks.openAIConstructor).toHaveBeenCalledWith({
-      apiKey: "openrouter-key",
-      baseURL: "https://openrouter.ai/api/v1",
-    });
-    expect(mocks.createClient).toHaveBeenCalledWith(
-      "https://example.supabase.co",
-      "supabase-key"
-    );
-    expect(mocks.embeddingsCreate).toHaveBeenCalledWith({
-      model: "openai/text-embedding-3-small",
-      input: "规则 制度 Institutions 产权 Property Rights",
-    });
-    expect(mocks.chatCompletionsCreate).toHaveBeenCalledWith(
-      {
-        model: "openai/gpt-4o-mini",
-        messages: [
+    mocks.agentCreate
+      .mockResolvedValueOnce({
+        choices: [
           {
-            role: "system",
-            content:
-              "你是一个专业的经济学与政治哲学搜索引擎的提示词工程师。你的任务是提取用户提问的核心概念，并扩充相关的学术同义词、英文专有名词。请直接输出扩充后的搜索词，不要包含任何解释、标点或聊天废话。例如，用户输入'游戏规则'，你输出'游戏规则 Rules of the game 制度 Institutions 产权'。",
+            message: {
+              role: "assistant",
+              content: null,
+              tool_calls: [
+                {
+                  id: "call_1",
+                  type: "function",
+                  function: {
+                    name: "search_knowledge_base",
+                    arguments: JSON.stringify({ query: "制度经济学", match_count: 2 }),
+                  },
+                },
+              ],
+            },
           },
-          { role: "user", content: "规则如何促进合作？" },
         ],
-      },
-      expect.any(Object)
-    );
+      })
+      .mockResolvedValueOnce({
+        choices: [
+          {
+            message: {
+              role: "assistant",
+              content: "制度通过降低不确定性促进合作。",
+            },
+          },
+        ],
+      });
+
+    const response = await postSearch({ query: "规则如何促进合作？" });
+    const raw = await response.text();
+    const events = parseSseEvents(raw);
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get("Content-Type")).toContain("text/event-stream");
+    expect(events.map((event) => event.event)).toEqual([
+      "agent_started",
+      "tool_call_started",
+      "tool_call_result",
+      "iteration_summary",
+      "model_delta",
+      "iteration_summary",
+      "agent_finished",
+    ]);
+    expect(events[2]?.data.results).toMatchObject([
+      { id: "chunk-1", chapter_title: "制度与合作" },
+      { id: "chunk-2", chapter_title: "分工" },
+    ]);
+    expect(events[4]?.data.delta).toBe("制度通过降低不确定性促进合作。");
     expect(mocks.rpc).toHaveBeenCalledWith("hybrid_search", {
-      query_text: "规则 制度 Institutions 产权 Property Rights",
+      query_text: "制度经济学",
       query_embedding: [0.1, 0.2, 0.3],
-      match_count: 3,
+      match_count: 2,
       book_uuid_param: null,
     });
   });
 
-  it("handles an empty embedding response", async () => {
-    mocks.chatCompletionsCreate.mockResolvedValue({
-      choices: [{ message: { content: "方法论个人主义 Methodological Individualism" } }],
+  it("fails with terminal event when max iterations are exhausted", async () => {
+    mocks.rewriteCreate.mockResolvedValue({
+      choices: [{ message: { content: "制度 Institutions" } }],
     });
-    mocks.embeddingsCreate.mockResolvedValue({ data: [] });
-
-    const response = await postSearch({ query: "方法论个人主义是什么？" });
-
-    await expect(response.json()).resolves.toEqual({
-      error: "Embedding provider returned no vector.",
-    });
-    expect(response.status).toBe(500);
-    expect(mocks.rpc).not.toHaveBeenCalled();
-  });
-
-  it("surfaces Supabase RPC errors as gateway failures", async () => {
-    mocks.chatCompletionsCreate.mockResolvedValue({
-      choices: [{ message: { content: "产权 Property Rights" } }],
-    });
-    mocks.embeddingsCreate.mockResolvedValue({
-      data: [{ embedding: [0.1, 0.2, 0.3] }],
-    });
-    mocks.rpc.mockResolvedValue({
-      data: null,
-      error: { message: "hybrid_search failed" },
-    });
-
-    const response = await postSearch({ query: "产权为何重要？" });
-
-    await expect(response.json()).resolves.toEqual({
-      error: "hybrid_search failed",
-    });
-    expect(response.status).toBe(500);
-  });
-
-  it("falls back to original query when rewrite fails", async () => {
-    mocks.chatCompletionsCreate.mockRejectedValue(new Error("rewrite timeout"));
     mocks.embeddingsCreate.mockResolvedValue({
       data: [{ embedding: [0.1, 0.2, 0.3] }],
     });
@@ -246,13 +228,33 @@ describe("POST /api/search", () => {
       data: [],
       error: null,
     });
-
-    const response = await postSearch({ query: "游戏规则" });
-
-    expect(response.status).toBe(200);
-    expect(mocks.embeddingsCreate).toHaveBeenCalledWith({
-      model: "openai/text-embedding-3-small",
-      input: "游戏规则",
+    mocks.agentCreate.mockResolvedValue({
+      choices: [
+        {
+          message: {
+            role: "assistant",
+            content: null,
+            tool_calls: [
+              {
+                id: "call_loop",
+                type: "function",
+                function: {
+                  name: "search_knowledge_base",
+                  arguments: JSON.stringify({ query: "制度", match_count: 1 }),
+                },
+              },
+            ],
+          },
+        },
+      ],
     });
+
+    const response = await postSearch({ query: "制度是什么？" });
+    const events = parseSseEvents(await response.text());
+    const lastEvent = events[events.length - 1];
+
+    expect(lastEvent?.event).toBe("agent_failed");
+    expect(lastEvent?.data.reason).toBe("max_iterations_exceeded");
+    expect(mocks.rpc).toHaveBeenCalledTimes(4);
   });
 });

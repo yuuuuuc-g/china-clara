@@ -24,10 +24,19 @@ load_dotenv(".env.local")
 # 作为兜底，再读取普通的 .env 文件（如果里面有公共配置的话）
 load_dotenv(".env")
 
-openai_client = OpenAI(
-    base_url="https://openrouter.ai/api/v1",
-    api_key=os.environ.get("OPENROUTER_API_KEY") 
+# ── ✨ 核心修复：双引擎客户端初始化 ──────────────────────────────────
+# 1. 初始化专门负责向量计算的硅基流动客户端
+embedding_client = OpenAI(
+    api_key=os.environ.get("SILICONFLOW_API_KEY"),
+    base_url="https://api.siliconflow.cn/v1"
 )
+
+# 2. 初始化专门负责生成摘要的 DeepSeek 客户端
+llm_client = OpenAI(
+    api_key=os.environ.get("DEEPSEEK_API_KEY"),
+    base_url="https://api.deepseek.com"  # ✨ DeepSeek 的官方接口
+)
+
 supabase = create_client(os.environ["SUPABASE_URL"], os.environ["SUPABASE_KEY"])
 
 # ── 1. EPUB 解析 (增强鲁棒性) ──────────────────────────────────
@@ -220,8 +229,9 @@ def generate_chapter_summary(chapter: Chapter, book_title: str, author: str) -> 
     preview = chapter.content[:1500] 
     
     try:
-        resp = openai_client.chat.completions.create(
-            model="openai/gpt-4o-mini",
+        # ✨ 修复点 1：使用专门的 llm_client 调用 Gemini 模型
+        resp = llm_client.chat.completions.create(
+            model="deepseek-chat",  # ✨ 替换为 DeepSeek 模型
             messages=[{
                 "role": "user",
                 "content": f"""你是《{book_title}》（作者：{author}）的专属学术研究助手。
@@ -251,19 +261,21 @@ def generate_chapter_summary(chapter: Chapter, book_title: str, author: str) -> 
 
 def embed_texts(texts: list[str]) -> list[list[float]]:
     vectors = []
-    batch_size = 100 
+    batch_size = 50 
     for i in range(0, len(texts), batch_size):
         batch = texts[i:i + batch_size]
         try:
-            resp = openai_client.embeddings.create(
-                model="openai/text-embedding-3-small",
+            # ✨ 修复点 2：使用 embedding_client 调用硅基流动的 1024 维模型
+            resp = embedding_client.embeddings.create(
+                model="BAAI/bge-m3",
                 input=batch,
             )
             vectors.extend([r.embedding for r in resp.data])
             time.sleep(0.3) 
         except Exception as e:
             print(f"  [Error] 向量化批次失败: {e}")
-            vectors.extend([[0.0] * 1536 for _ in range(len(batch))]) 
+            # ✨ 修复点 3：失败时填充默认 1024 维零向量，防止数据库因维度不匹配崩溃
+            vectors.extend([[0.0] * 1024 for _ in range(len(batch))]) 
     return vectors
 
 # ── 5. 内存隔离式写入 (核心优化区) ──────────────────────────────
@@ -316,10 +328,10 @@ def upload_book(chapters: list[Chapter], book_id: str, book_title: str, author: 
 # ── 启动舱 ──────────────────────────────────────────────────────
 
 if __name__ == "__main__":
-    TARGET_PATH = os.environ.get("TARGET_PATH", "rag-pipeline/The_Deficit_Myth.epub")
+    TARGET_PATH = os.environ.get("TARGET_PATH", "rag-pipeline/经济学的思维方式.epub")
     MARKER_OUTPUT_DIR = os.environ.get("MARKER_OUTPUT_DIR", "./data/temp_md/")
-    BOOK_TITLE = "The_Deficit_Myth"
-    BOOK_AUTHOR = "Thomas Sowell"
+    BOOK_TITLE = "经济学的思维方式"
+    BOOK_AUTHOR = "托马斯·索维尔"
 
     print(f"🚀 初始化 RAG 摄入管线: {BOOK_TITLE}")
 

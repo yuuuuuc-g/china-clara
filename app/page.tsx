@@ -1,17 +1,20 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { memo, useCallback, useEffect, useMemo, useState } from "react";
 import { Canvas } from "@react-three/fiber";
 // ✨ 引入 Environment 组件
 import { OrbitControls, Stars, Environment } from "@react-three/drei";
 import { AnimatePresence, motion } from "framer-motion";
 import { CoreStar } from "@/src/components/canvas/CoreStar";
-import { SolarSystem } from "@/src/components/canvas/SolarSystem";
+import { PLANETS, SolarSystem } from "@/src/components/canvas/SolarSystem";
 import { CameraController } from "@/src/components/canvas/CameraController";
 import { NodeDetailPanel } from "@/src/components/hud/NodeDetailPanel";
 import { ArchivePanel } from "@/src/components/hud/ArchivePanel";
+import { SunConsole } from "@/src/components/hud/SunConsole";
+import { SaturnConsole } from "@/src/components/hud/SaturnConsole";
 import { GalaxyWorkspace } from "@/src/components/galaxy-workspace";
 import { useSolarStore } from "@/src/store/solarStore";
+import { useDevRenderCounter } from "@/src/lib/dev-render-profiler";
 
 function WebGLWarning() {
   return (
@@ -24,11 +27,78 @@ function WebGLWarning() {
   );
 }
 
+interface SceneProps {
+  hasFocusedPlanet: boolean;
+  orbitTarget: [number, number, number];
+  onSunClick: () => void;
+}
+
+const Scene = ({ hasFocusedPlanet, orbitTarget, onSunClick }: SceneProps) => {
+  useDevRenderCounter("Home::MemoizedScene");
+  return (
+    <Canvas
+      className="z-0"
+      camera={{ position: [0, 8, 40], fov: 45 }}
+      dpr={[1, 1.5]}
+      gl={{
+        antialias: false,
+        powerPreference: "high-performance",
+        preserveDrawingBuffer: true,
+      }}
+      onCreated={({ gl }) => {
+        gl.getContext().canvas.addEventListener("webglcontextlost", (e) => {
+          e.preventDefault();
+          console.warn("WebGL context lost inside R3F Canvas");
+        });
+      }}
+    >
+      <Environment
+        background
+        files="/textures/2k_stars_milky_way.jpg"
+      />
+
+      <ambientLight intensity={0.6} />
+      <directionalLight
+        position={[15, 10, 5]}
+        intensity={1.8}
+        color="#ffffff"
+      />
+
+      <OrbitControls
+        enablePan={false}
+        minDistance={5}
+        maxDistance={100}
+        enabled={!hasFocusedPlanet}
+        target={orbitTarget}
+      />
+
+      <Stars
+        radius={50}
+        depth={50}
+        count={100}
+        factor={4}
+        saturation={0}
+        fade
+        speed={1}
+      />
+
+      <CameraController />
+      <CoreStar onSunClick={onSunClick} />
+      <SolarSystem />
+    </Canvas>
+  );
+};
+
+export const MemoizedScene = memo(Scene);
+
 export default function Home() {
+  useDevRenderCounter("Home::Root");
   const focusedPlanet = useSolarStore((state) => state.focusedPlanet);
+  const setFocusedPlanet = useSolarStore((state) => state.setFocusedPlanet);
   const [webglLost, setWebglLost] = useState(false);
   const [showArchive, setShowArchive] = useState(false);
   const [isRAGOpen, setIsRAGOpen] = useState(false);
+  const [showSunConsole, setShowSunConsole] = useState(false);
   const orbitTarget = useMemo<[number, number, number]>(() => [0, 0, 0], []);
 
   const handleContextLost = useCallback((event: Event) => {
@@ -55,11 +125,55 @@ export default function Home() {
     };
   }, [handleContextLost, handleContextRestored]);
 
+  const isRAGVisible = isRAGOpen && focusedPlanet?.name === "Neptune";
+  const isSaturnVisible = focusedPlanet?.name === "Saturn";
+
   useEffect(() => {
-    if (focusedPlanet?.name !== "Neptune" && isRAGOpen) {
-      setIsRAGOpen(false);
-    }
-  }, [focusedPlanet, isRAGOpen]);
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setShowSunConsole(false);
+      }
+    };
+
+    window.addEventListener("keydown", onKeyDown);
+    return () => {
+      window.removeEventListener("keydown", onKeyDown);
+    };
+  }, []);
+
+  const handleSunConsolePlanetSelect = useCallback(
+    (planetId: string) => {
+      const selectedPlanet = PLANETS.find(
+        (planet) => planet.name.toLowerCase() === planetId.toLowerCase()
+      );
+      if (!selectedPlanet) {
+        return;
+      }
+      setFocusedPlanet(selectedPlanet);
+      setShowSunConsole(false);
+    },
+    [setFocusedPlanet]
+  );
+  const handleSunClick = useCallback(() => {
+    setShowSunConsole(true);
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const applyHashFocus = () => {
+      const hash = window.location.hash.replace(/^#/, "").toLowerCase();
+      if (!hash) return;
+      const candidate = PLANETS.find(
+        (planet) => planet.name.toLowerCase() === hash
+      );
+      if (candidate) {
+        setFocusedPlanet(candidate);
+      }
+    };
+    applyHashFocus();
+    window.addEventListener("hashchange", applyHashFocus);
+    return () => window.removeEventListener("hashchange", applyHashFocus);
+  }, [setFocusedPlanet]);
 
   return (
     <main className="relative h-screen w-screen bg-black">
@@ -72,57 +186,11 @@ export default function Home() {
         </p>
       </div>
 
-      <Canvas
-        className="z-0"
-        camera={{ position: [0, 8, 40], fov: 45 }}
-        dpr={[1, 1.5]} // ✨ 新增：限制像素倍率，防卡顿神器！
-        onCreated={({ gl }) => {
-          gl.getContext().canvas.addEventListener("webglcontextlost", (e) => {
-            e.preventDefault();
-            console.warn("WebGL context lost inside R3F Canvas");
-          });
-        }}
-      >
-        {/* ✨ 核心升级：挂载银河系全景背景 */}
-        <Environment 
-          background 
-          files="/textures/8k_stars_milky_way.jpg" 
-        />
-
-        <ambientLight intensity={0.6} />
-
-        <directionalLight 
-          position={[15, 10, 5]} 
-          intensity={1.8} 
-          color="#ffffff"
-        />
-
-        <OrbitControls
-          enablePan={false}
-          minDistance={5}
-          maxDistance={100}
-          enabled={!focusedPlanet}
-          target={orbitTarget}
-        />
-
-        {/* 保留原有的 Stars 组件。
-          银河贴图作为远景背景，点状的 Stars 作为近景悬浮物。
-          拖拽视角时，两者会产生极其深邃的视差 (Parallax) 效果！
-        */}
-        <Stars
-          radius={50}
-          depth={50}
-          count={100}
-          factor={4}
-          saturation={0}
-          fade
-          speed={1}
-        />
-
-        <CameraController />
-        <CoreStar />
-        <SolarSystem />
-      </Canvas>
+      <MemoizedScene
+        hasFocusedPlanet={focusedPlanet !== null}
+        orbitTarget={orbitTarget}
+        onSunClick={handleSunClick}
+      />
 
       <NodeDetailPanel
         onEnterArchive={() => setShowArchive(true)}
@@ -130,15 +198,26 @@ export default function Home() {
           setShowArchive(false);
           setIsRAGOpen(true);
         }}
-        isRAGOpen={isRAGOpen}
+        isRAGOpen={isRAGVisible}
       />
 
       {showArchive && (
         <ArchivePanel onClose={() => setShowArchive(false)} />
       )}
 
+      <SunConsole
+        isOpen={showSunConsole}
+        onClose={() => setShowSunConsole(false)}
+        onPlanetSelect={handleSunConsolePlanetSelect}
+      />
+
+      <SaturnConsole
+        isOpen={isSaturnVisible}
+        onClose={() => setFocusedPlanet(null)}
+      />
+
       <AnimatePresence>
-        {isRAGOpen && (
+        {isRAGVisible && (
           <motion.aside
             className="absolute inset-y-0 right-0 z-30 flex h-full h-screen w-full max-w-[min(1100px,95vw)] flex-col border-l border-cyan-300/20 bg-black/95 shadow-[-24px_0_80px_rgba(0,0,0,0.6)]"
             initial={{ x: "100%" }}

@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useCompletion } from "@ai-sdk/react";
+import { motion } from "framer-motion";
 import Placeholder from "@tiptap/extension-placeholder";
 import { EditorContent, useEditor } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
@@ -122,6 +123,35 @@ function extractOptionBlocks(text: string): string[] {
   }
 
   return blocks;
+}
+
+function sanitizeStreamingOutput(text: string): string {
+  if (!text) {
+    return "";
+  }
+
+  const withoutXmlToolCalls = text
+    .replace(/<tool_call>[\s\S]*?<\/tool_call>/g, "")
+    .replace(/<tool_result>[\s\S]*?<\/tool_result>/g, "");
+
+  const filteredLines = withoutXmlToolCalls
+    .split("\n")
+    .filter((line) => {
+      const trimmed = line.trim();
+      if (!trimmed) {
+        return true;
+      }
+      return !(
+        trimmed.includes('"toolName"') ||
+        trimmed.includes('"toolCallId"') ||
+        trimmed.includes('"type":"tool-call"') ||
+        trimmed.includes('"type": "tool-call"') ||
+        trimmed.includes('"type":"tool-result"') ||
+        trimmed.includes('"type": "tool-result"')
+      );
+    });
+
+  return filteredLines.join("\n").trim();
 }
 
 function parseLabeledLines(block: string): { label: string; value: string }[] {
@@ -304,6 +334,14 @@ export default function RefineryPage() {
   } = useCompletion({
     api: "/api/analytical-pipeline",
     streamProtocol: "text",
+    onFinish: (_prompt, completionText) => {
+      console.info("[Mars Crucible] completion finished", {
+        chars: completionText.length,
+      });
+    },
+    onError: (error) => {
+      console.error("[Mars Crucible] completion error", error);
+    },
   });
 
   const [isEditing, setIsEditing] = useState(false);
@@ -559,7 +597,7 @@ export default function RefineryPage() {
     phase === "D"
       ? ""
       : pendingPhase === phase && isLoading
-        ? completion
+        ? sanitizeStreamingOutput(completion)
         : archives[phase];
 
   const optionBlocks = useMemo(
@@ -652,22 +690,28 @@ export default function RefineryPage() {
       }
     }
 
-    const result = await complete(prompt, {
-      body: requestBody,
-    });
+    try {
+      const result = await complete(prompt, {
+        body: requestBody,
+      });
+      const finalText = sanitizeStreamingOutput(result ?? "");
 
-    const finalText = result ?? "";
-
-    if (targetPhase === "D") {
-      setDraftD(finalText);
-    } else {
-      setArchives((current) => ({
-        ...current,
-        [targetPhase]: finalText,
-      }));
+      if (targetPhase === "D") {
+        setDraftD(finalText);
+      } else {
+        setArchives((current) => ({
+          ...current,
+          [targetPhase]: finalText,
+        }));
+      }
+    } catch (error) {
+      console.error("[Mars Crucible] runPhase failed", {
+        targetPhase,
+        error,
+      });
+    } finally {
+      setPendingPhase(null);
     }
-
-    setPendingPhase(null);
   };
 
   const advancePhase = () => {
@@ -738,34 +782,63 @@ export default function RefineryPage() {
             className={`sticky top-5 flex flex-col gap-5 self-start transition-all duration-500 ease-in-out ${
               isWorkbenchOpen
                 ? "w-full lg:w-[38%]"
-                : "w-full max-w-3xl mx-auto"
+                : "mx-auto w-full max-w-4xl"
             }`}
           >
-            <GlassPanel className="rounded p-4 sm:p-5">
-              <div className="mb-5 grid grid-cols-4 gap-2">
-                {phaseOrder.map((p) => (
-                  <button
-                    key={p}
-                    type="button"
-                    onClick={() => {
-                      setPhase(p);
-                      setIsEditing(false);
-                      if (p !== "D") {
-                        setCompletion("");
-                      }
-                    }}
-                    className={`rounded border px-3 py-2 text-left transition ${
-                      phase === p
-                        ? "border-[#deff9a]/60 bg-[#deff9a]/10 text-[#deff9a]"
-                        : "border-white/10 bg-white/[0.03] text-white/45 hover:border-white/25 hover:text-white/80"
-                    }`}
-                  >
-                    <span className="block text-xs font-bold">Phase {p}</span>
-                    <span className="mt-1 block text-[11px]">
-                      {phaseMeta[p].kicker}
-                    </span>
-                  </button>
-                ))}
+            <GlassPanel className="rounded p-6 sm:p-10">
+              <div className="mb-4 -mt-2 overflow-x-auto">
+                <div className="relative flex min-w-[680px] items-center justify-between py-6">
+                  <div className="absolute left-0 top-1/2 h-px w-full -translate-y-1/2 bg-white/15" />
+                  <motion.div
+                    className="absolute left-0 top-1/2 h-px w-full -translate-y-1/2 bg-gradient-to-r from-emerald-400/90 via-cyan-400/85 to-blue-500/90 shadow-[0_0_6px_rgba(16,185,129,0.5)]"
+                    initial={{ scaleX: 0, opacity: 0.5 }}
+                    animate={{ scaleX: 1, opacity: 1 }}
+                    transition={{ duration: 0.7, ease: "easeOut" }}
+                    style={{ transformOrigin: "left center" }}
+                  />
+                  {phaseOrder.map((p, index) => {
+                    const isActive = phase === p;
+                    const isEven = index % 2 === 0;
+                    const titleToneClass = isEven ? "text-emerald-400" : "text-blue-500";
+                    return (
+                      <motion.button
+                        key={p}
+                        type="button"
+                        onClick={() => {
+                          setPhase(p);
+                          setIsEditing(false);
+                          if (p !== "D") {
+                            setCompletion("");
+                          }
+                        }}
+                        initial={{ opacity: 0, x: -36, y: isEven ? -8 : 8 }}
+                        animate={{ opacity: 1, x: 0, y: 0 }}
+                        transition={{ delay: index * 0.12, duration: 0.28, ease: "easeOut" }}
+                        className="group relative flex-1 px-4 text-center"
+                      >
+                        <div
+                          className={`absolute left-1/2 top-1/2 z-10 h-3 w-3 -translate-x-1/2 -translate-y-1/2 rounded-full ${
+                            isActive
+                              ? "bg-emerald-400 shadow-[0_0_14px_rgba(16,185,129,1)]"
+                              : "bg-cyan-300/70 shadow-[0_0_10px_rgba(59,130,246,0.65)]"
+                          }`}
+                        />
+                        <div className={isEven ? "mb-10" : "mt-10"}>
+                          <p
+                            className={`text-xs font-bold tracking-[0.18em] transition ${
+                              isActive ? titleToneClass : "text-gray-400 group-hover:text-white"
+                            }`}
+                          >
+                            PHASE {p}
+                          </p>
+                          <p className="mt-1 font-mono text-[10px] text-gray-400">
+                            {phaseMeta[p].kicker}
+                          </p>
+                        </div>
+                      </motion.button>
+                    );
+                  })}
+                </div>
               </div>
 
               <div>

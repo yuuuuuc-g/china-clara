@@ -33,3 +33,24 @@ create trigger update_documents_updated_at
   before update on documents
   for each row
   execute function update_updated_at_column();
+
+create table daily_briefings (
+  id uuid primary key default uuid_generate_v4(),
+  date date not null default current_date,
+  source text not null,
+  title text not null,
+  url text not null,
+  ai_summary text not null,
+  created_at timestamp with time zone default now() not null
+);
+
+create unique index uniq_daily_briefings_date_url on daily_briefings(date, url);
+create index idx_daily_briefings_date on daily_briefings(date desc);
+create index idx_daily_briefings_created_at on daily_briefings(created_at desc);
+
+alter table daily_briefings enable row level security;
+
+create policy "daily_briefings_read_all" on daily_briefings
+  for select
+  using (true);
+

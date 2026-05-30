@@ -5,7 +5,11 @@ import { useFrame } from "@react-three/fiber";
 import { Sphere } from "@react-three/drei";
 import * as THREE from "three";
 
-export function CoreStar() {
+interface CoreStarProps {
+  onSunClick?: () => void;
+}
+
+export function CoreStar({ onSunClick }: CoreStarProps) {
   // Matt Pocock 规范：明确声明 Ref 类型
   const starRef = useRef<THREE.Mesh>(null!);
 
@@ -35,6 +39,23 @@ export function CoreStar() {
         */}
         <meshBasicMaterial map={texture} color="#ffffff" toneMapped={false} />
       </Sphere>
+      <mesh
+        onClick={(event) => {
+          event.stopPropagation();
+          onSunClick?.();
+        }}
+        onPointerOver={(event) => {
+          event.stopPropagation();
+          document.body.style.cursor = "pointer";
+        }}
+        onPointerOut={(event) => {
+          event.stopPropagation();
+          document.body.style.cursor = "auto";
+        }}
+      >
+        <sphereGeometry args={[2, 32, 32]} />
+        <meshBasicMaterial transparent opacity={0} depthWrite={false} />
+      </mesh>
       
       {/* 核心光源：照亮周围带有 MeshStandardMaterial 的行星 */}
       <pointLight 

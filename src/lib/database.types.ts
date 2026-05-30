@@ -84,6 +84,35 @@ export interface Database {
           created_at?: string;
         };
       };
+      daily_briefings: {
+        Row: {
+          id: string;
+          date: string;
+          source: string;
+          title: string;
+          url: string;
+          ai_summary: string;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          date?: string;
+          source: string;
+          title: string;
+          url: string;
+          ai_summary: string;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          date?: string;
+          source?: string;
+          title?: string;
+          url?: string;
+          ai_summary?: string;
+          created_at?: string;
+        };
+      };
     };
   };
 }
