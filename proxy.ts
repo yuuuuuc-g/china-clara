@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 
-export function middleware(req: NextRequest) {
+export function proxy(req: NextRequest) {
   const basicAuth = req.headers.get("authorization");
   const expectedPassword = process.env.SITE_PASSWORD;
 
@@ -16,6 +16,10 @@ export function middleware(req: NextRequest) {
   try {
     // 2. 解析过程（修复了直接使用 split(':') 导致密码内含有冒号时被错误截断的隐患）
     const authValue = basicAuth.split(" ")[1];
+    if (!authValue) {
+      throw new Error("Invalid Basic Auth format");
+    }
+
     const decodedValue = atob(authValue);
     const separatorIndex = decodedValue.indexOf(":");
 
@@ -30,13 +34,13 @@ export function middleware(req: NextRequest) {
     const isUserMatch = user === "admin";
     const isPwdMatch = pwd === expectedPassword;
 
-    console.log("================ MIDDLEWARE DEBUG ================");
+    console.log("================ PROXY DEBUG ================");
     console.log(
       `[预期密码] "${expectedPassword}" (类型: ${typeof expectedPassword}, 长度: ${expectedPassword?.length})`
     );
     console.log(`[收到账号] "${user}" (匹配: ${isUserMatch})`);
     console.log(`[收到密码] "${pwd}" (匹配: ${isPwdMatch}, 长度: ${pwd?.length})`);
-    console.log("==================================================");
+    console.log("================================================");
 
     if (isUserMatch && isPwdMatch) {
       return NextResponse.next();
@@ -47,12 +51,12 @@ export function middleware(req: NextRequest) {
       status: 401,
       headers: {
         "WWW-Authenticate": 'Basic realm="Secure Area"',
-        "X-Debug-Expected-Length": `${expectedPassword?.length}`,
+        "X-Debug-Expected-Length": `${expectedPassword?.length ?? "undefined"}`,
         "X-Debug-Provided-Length": `${pwd?.length}`,
       },
     });
   } catch (error) {
-    console.error("[Middleware Debug] 解析异常:", error);
+    console.error("[Proxy Debug] 解析异常:", error);
     return new NextResponse("Bad Request", { status: 400 });
   }
 }
