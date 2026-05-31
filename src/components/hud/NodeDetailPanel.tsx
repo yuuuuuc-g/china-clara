@@ -9,12 +9,14 @@ import { GlassPanel } from "@/src/components/ui/GlassPanel";
 interface NodeDetailPanelProps {
   onEnterArchive: () => void;
   onEnterExocortex: () => void;
+  onOpenSaturnRadar: () => void;
   isRAGOpen: boolean;
 }
 
 export function NodeDetailPanel({
   onEnterArchive,
   onEnterExocortex,
+  onOpenSaturnRadar,
   isRAGOpen,
 }: NodeDetailPanelProps) {
   const router = useRouter();
@@ -43,10 +45,13 @@ export function NodeDetailPanel({
   };
 
   const isNeptune = focusedPlanet.name === "Neptune";
+  const isSaturn = focusedPlanet.name === "Saturn";
   const panelTitle = isNeptune ? "Neptune - Exocortex" : focusedPlanet.name.toUpperCase();
   const panelDescription = isNeptune
     ? "The outermost gas giant of the solar system, now serving as the deep knowledge base gateway for the Exocortex."
-    : focusedPlanet.description;
+    : isSaturn
+      ? "Global macro intelligence radar. Sweep tier-1 media feeds daily and surface 5–10 structurally significant headlines for cross-border policy and business."
+      : focusedPlanet.description;
 
   return (
     <GlassPanel className="pointer-events-auto absolute right-0 top-0 z-20 flex h-full w-80 flex-col border-y-0 border-r-0 p-6">
@@ -118,6 +123,15 @@ export function NodeDetailPanel({
       </div>
 
       <div className="mt-auto pt-6">
+        {isSaturn && (
+          <CyberButton
+            className="mb-3 w-full"
+            onClick={onOpenSaturnRadar}
+          >
+            Open Radar
+          </CyberButton>
+        )}
+
         {isNeptune && (
           <CyberButton
             className="mb-3 w-full"

@@ -12,6 +12,51 @@ import { CopyButton } from "@/src/components/ui/CopyButton";
 import { useDevRenderCounter } from "@/src/lib/dev-render-profiler";
 
 const MAX_RENDERED_RESULTS = 3;
+const CHARACTER_LIMIT = 150;
+
+interface SourceItemProps {
+  result: SearchResult;
+  rank: number;
+}
+
+function SourceItem({ result, rank }: SourceItemProps) {
+  const [isExpanded, setIsExpanded] = useState(false);
+  const isTruncatable = result.content.length > CHARACTER_LIMIT;
+  const displayContent =
+    isTruncatable && !isExpanded
+      ? `${result.content.slice(0, CHARACTER_LIMIT)}...`
+      : result.content;
+
+  return (
+    <article className="relative rounded-xl border border-white/10 bg-white/[0.04] p-4">
+      <CopyButton textToCopy={result.content} />
+      <div className="mb-2 flex items-center justify-between gap-3 pr-8">
+        <div className="flex min-w-0 items-center gap-1 font-mono text-xs text-emerald-400/80">
+          <span aria-hidden>◆</span>
+          <span className="truncate">Source: {result.chapter_title}</span>
+        </div>
+        <span
+          className="shrink-0 rounded border border-cyan-300/20 bg-cyan-950/40 px-2 py-0.5 font-mono text-[10px] tracking-widest text-cyan-200/70"
+          title="Hybrid retrieval rank (RRF fusion order)"
+        >
+          [RANK #{rank}]
+        </span>
+      </div>
+      <p className="mt-2 text-sm leading-6 text-white/65">
+        {displayContent}
+        {isTruncatable && (
+          <button
+            type="button"
+            onClick={() => setIsExpanded((current) => !current)}
+            className="ml-2 text-xs text-blue-400/80 underline underline-offset-2 transition-colors hover:text-blue-300"
+          >
+            {isExpanded ? "[COLLAPSE]" : "[EXPAND]"}
+          </button>
+        )}
+      </p>
+    </article>
+  );
+}
 
 interface SearchResponseBody {
   results?: SearchResult[];
@@ -531,7 +576,7 @@ function GalaxyWorkspaceHud({ onHighlightedNodeChange, nodesError }: GalaxyWorks
         data-testid="search-results"
       >
         <p className="text-xs uppercase tracking-[0.28em] text-white/40">
-          Top Matches
+          Sources
         </p>
 
         {renderedResults.length === 0 ? (
@@ -541,27 +586,7 @@ function GalaxyWorkspaceHud({ onHighlightedNodeChange, nodesError }: GalaxyWorks
         ) : (
           <div className="mt-4 space-y-3">
             {renderedResults.map((result, index) => (
-              <article
-                className="relative rounded-xl border border-white/10 bg-white/[0.04] p-4"
-                key={result.id}
-              >
-                <CopyButton textToCopy={result.content} />
-                <div className="mb-2 flex items-center gap-1 font-mono text-xs text-emerald-400/80">
-                  <span aria-hidden>◆</span>
-                  <span>Source: {result.chapter_title}</span>
-                </div>
-                <div className="flex items-center justify-between gap-3 pr-8">
-                  <h2 className="text-sm font-semibold text-cyan-100">
-                    {index + 1}. {result.chapter_title}
-                  </h2>
-                  <span className="rounded-full bg-white/10 px-2 py-1 text-xs text-white/60">
-                    {result.similarity.toFixed(3)}
-                  </span>
-                </div>
-                <p className="mt-2 line-clamp-4 text-sm leading-6 text-white/65">
-                  {result.content}
-                </p>
-              </article>
+              <SourceItem key={result.id} rank={index + 1} result={result} />
             ))}
           </div>
         )}

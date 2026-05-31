@@ -54,7 +54,7 @@ const Scene = ({ hasFocusedPlanet, orbitTarget, onSunClick }: SceneProps) => {
     >
       <Environment
         background
-        files="/textures/2k_stars_milky_way.jpg"
+        files="/textures/8k_stars_milky_way.jpg"
       />
 
       <ambientLight intensity={0.6} />
@@ -99,6 +99,7 @@ export default function Home() {
   const [showArchive, setShowArchive] = useState(false);
   const [isRAGOpen, setIsRAGOpen] = useState(false);
   const [showSunConsole, setShowSunConsole] = useState(false);
+  const [showSaturnRadar, setShowSaturnRadar] = useState(false);
   const orbitTarget = useMemo<[number, number, number]>(() => [0, 0, 0], []);
 
   const handleContextLost = useCallback((event: Event) => {
@@ -126,12 +127,18 @@ export default function Home() {
   }, [handleContextLost, handleContextRestored]);
 
   const isRAGVisible = isRAGOpen && focusedPlanet?.name === "Neptune";
-  const isSaturnVisible = focusedPlanet?.name === "Saturn";
+
+  useEffect(() => {
+    if (focusedPlanet?.name !== "Saturn") {
+      setShowSaturnRadar(false);
+    }
+  }, [focusedPlanet?.name]);
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
         setShowSunConsole(false);
+        setShowSaturnRadar(false);
       }
     };
 
@@ -198,6 +205,7 @@ export default function Home() {
           setShowArchive(false);
           setIsRAGOpen(true);
         }}
+        onOpenSaturnRadar={() => setShowSaturnRadar(true)}
         isRAGOpen={isRAGVisible}
       />
 
@@ -212,8 +220,8 @@ export default function Home() {
       />
 
       <SaturnConsole
-        isOpen={isSaturnVisible}
-        onClose={() => setFocusedPlanet(null)}
+        isOpen={showSaturnRadar}
+        onClose={() => setShowSaturnRadar(false)}
       />
 
       <AnimatePresence>
