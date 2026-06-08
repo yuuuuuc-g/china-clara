@@ -1,8 +1,10 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft, Tag, Lightbulb } from "lucide-react";
+import { Tag, Lightbulb } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
+import { ArchiveBackButton } from "./ArchiveBackButton";
+import { ArchiveExportActions } from "@/src/components/hud/ArchiveExportActions";
 import { createServerSupabase } from "@/src/lib/supabase/server";
 import type { Database } from "@/src/lib/database.types";
 
@@ -63,13 +65,7 @@ export default async function ArchivePage({ params }: ArchivePageProps) {
     <div className="min-h-screen overflow-y-auto bg-zinc-950 text-white">
       <header className="sticky top-0 z-10 border-b border-white/10 bg-zinc-950/80 backdrop-blur-sm">
         <div className="mx-auto flex max-w-7xl items-center justify-between px-6 py-4">
-          <Link
-            href="/"
-            className="flex items-center gap-2 text-sm text-white/60 transition hover:text-[#deff9a]"
-          >
-            <ArrowLeft size={16} />
-            <span>Back to Sun</span>
-          </Link>
+          <ArchiveBackButton />
           <Link
             href="/knowledge-graph"
             className="flex items-center gap-2 text-sm text-white/60 transition hover:text-[#deff9a]"
@@ -86,8 +82,16 @@ export default async function ArchivePage({ params }: ArchivePageProps) {
       <main className="mx-auto max-w-7xl px-6 py-8">
         <div className="grid grid-cols-1 gap-8 lg:grid-cols-4">
           <article className="lg:col-span-3">
+            <div className="mb-6 flex flex-wrap items-center justify-between gap-4 border-b border-white/10 pb-4">
+              <h1 className="font-serif text-4xl tracking-wide text-[#deff9a]">
+                {document.title}
+              </h1>
+              <ArchiveExportActions
+                title={document.title}
+                content={document.content_markdown}
+              />
+            </div>
             <div className="prose prose-invert prose-zinc max-w-none prose-headings:text-[#deff9a] prose-a:text-[#deff9a]">
-              <h1 className="mb-8 font-serif text-4xl tracking-wide">{document.title}</h1>
               <ReactMarkdown remarkPlugins={[remarkGfm]}>
                 {document.content_markdown}
               </ReactMarkdown>

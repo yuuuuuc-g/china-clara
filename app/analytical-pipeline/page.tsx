@@ -737,6 +737,23 @@ export default function RefineryPage() {
     setSelectedTopicId(null);
   };
 
+  const handleBackToMars = () => {
+    if (window.parent !== window) {
+      window.parent.postMessage(
+        { type: "knowledge-galaxy:close-system" },
+        window.location.origin,
+      );
+      return;
+    }
+
+    if (window.history.length > 1) {
+      router.back();
+      return;
+    }
+
+    router.push("/#mars");
+  };
+
   const showAdvance =
     nextPhase !== null &&
     phase !== "D" &&
@@ -749,33 +766,23 @@ export default function RefineryPage() {
     <main className="min-h-screen overflow-y-auto bg-zinc-950 text-white">
       <div className="fixed inset-0 bg-[radial-gradient(circle_at_top_left,rgba(222,255,154,0.12),transparent_32%),radial-gradient(circle_at_bottom_right,rgba(255,255,255,0.08),transparent_28%)]" />
       <div className="relative z-10 mx-auto flex min-h-screen w-full max-w-7xl flex-col gap-5 px-5 py-5 sm:px-8 sm:py-8">
-        <header className="flex flex-col gap-4 border-b border-white/10 pb-5 sm:flex-row sm:items-end sm:justify-between">
-          <div>
-            <p className="text-xs font-bold tracking-[0.35em] text-[#deff9a]/70">
-              EXOCORTEX CRUCIBLE
-            </p>
-            <h1 className="mt-2 font-serif text-3xl tracking-widest text-white sm:text-4xl">
-              The Crucible
-            </h1>
-          </div>
-          <div className="flex flex-col gap-2 sm:flex-row">
-            <CyberButton
-              variant="secondary"
-              className="w-full sm:w-auto"
-              onClick={resetFlow}
-            >
-              RESET FLOW
-            </CyberButton>
-            <CyberButton
-              variant="secondary"
-              className="w-full sm:w-auto"
-              onClick={() => router.push("/")}
-            >
-              <ArrowLeft size={16} aria-hidden="true" />
-              BACK TO MARS
-            </CyberButton>
-          </div>
-        </header>
+        <div className="absolute right-5 top-5 z-30 flex items-center gap-2 sm:right-8 sm:top-8">
+          <CyberButton
+            variant="secondary"
+            className="min-h-8 px-2.5 py-1.5 text-[10px]"
+            onClick={handleBackToMars}
+          >
+            <ArrowLeft size={13} aria-hidden="true" />
+            Back to Mars
+          </CyberButton>
+          <CyberButton
+            variant="secondary"
+            className="min-h-8 px-2.5 py-1.5 text-[10px]"
+            onClick={resetFlow}
+          >
+            Reset Flow
+          </CyberButton>
+        </div>
 
         <section className="relative flex flex-1 items-start gap-5 overflow-x-hidden">
           <div

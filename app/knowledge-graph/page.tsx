@@ -118,7 +118,17 @@ function buildNexusGraph(documents: DocumentWithSessions[]): NexusGraphData {
   return { nodes, links };
 }
 
-export default async function KnowledgeGraphPage() {
+interface KnowledgeGraphPageProps {
+  searchParams?: Promise<{
+    embed?: string;
+  }>;
+}
+
+export default async function KnowledgeGraphPage({
+  searchParams,
+}: KnowledgeGraphPageProps) {
+  const resolvedSearchParams = await searchParams;
+  const isEmbedded = resolvedSearchParams?.embed === "1";
   const supabase = await createServerSupabase();
   const { data, error } = await supabase
     .from("documents")
@@ -134,30 +144,22 @@ export default async function KnowledgeGraphPage() {
   return (
     <main className="min-h-screen bg-zinc-950 text-white">
       <div className="fixed inset-0 bg-[radial-gradient(circle_at_top_left,rgba(222,255,154,0.12),transparent_30%),radial-gradient(circle_at_bottom_right,rgba(255,255,255,0.07),transparent_28%)]" />
-      <div className="relative z-10 mx-auto flex min-h-screen w-full max-w-7xl flex-col gap-5 px-6 py-8">
-        <header className="flex flex-col gap-4 border-b border-white/10 pb-6 sm:flex-row sm:items-end sm:justify-between">
-          <div>
-            <p className="text-xs font-bold tracking-[0.35em] text-[#deff9a]/70">
-              A SPACE
-            </p>
-            <h1 className="mt-2 font-serif text-4xl tracking-widest text-white">
-              THE NEXUS
-            </h1>
-            <p className="mt-2 text-sm tracking-wide text-white/45">
-              Interconnected Cognitive Nodes
-            </p>
-          </div>
-          <Link
-            href="/"
-            className="inline-flex min-h-11 items-center justify-center gap-2 rounded border border-white/10 bg-white/[0.04] px-4 text-sm font-semibold tracking-wide text-white/70 transition hover:border-[#deff9a]/40 hover:text-[#deff9a]"
-          >
-            <ArrowLeft size={16} aria-hidden="true" />
-            BACK
-          </Link>
-        </header>
-
+      <div
+        className={`relative z-10 flex min-h-screen w-full flex-col ${
+          isEmbedded ? "" : "mx-auto max-w-7xl gap-5 px-6 py-8"
+        }`}
+      >
         <div className="relative">
-          <NexusGraphCanvas graphData={graphData} />
+          {!isEmbedded && (
+            <Link
+              href="/"
+              className="absolute right-4 top-4 z-20 inline-flex min-h-9 items-center justify-center gap-2 rounded border border-white/10 bg-black/50 px-3 text-xs font-semibold tracking-wide text-white/70 backdrop-blur-md transition hover:border-[#deff9a]/40 hover:text-[#deff9a]"
+            >
+              <ArrowLeft size={14} aria-hidden="true" />
+              Back
+            </Link>
+          )}
+          <NexusGraphCanvas graphData={graphData} fullBleed={isEmbedded} />
           <div className="pointer-events-none absolute bottom-8 left-5 font-mono text-xs uppercase tracking-[0.28em] text-[#deff9a]">
             <p>Documents {data?.length ?? 0}</p>
             <p className="mt-1">Nodes {graphData.nodes.length}</p>

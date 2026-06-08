@@ -1,25 +1,27 @@
 "use client";
 
-import { useRouter } from "next/navigation";
 import { AnimatePresence, motion } from "framer-motion";
 import { useSolarStore } from "@/src/store/solarStore";
 import { CyberButton } from "@/src/components/ui/CyberButton";
 import { GlassPanel } from "@/src/components/ui/GlassPanel";
 
 interface NodeDetailPanelProps {
+  onEnterAnalyticalPipeline: () => void;
   onEnterArchive: () => void;
+  onEnterKnowledgeGraph: () => void;
   onEnterExocortex: () => void;
   onOpenSaturnRadar: () => void;
   isRAGOpen: boolean;
 }
 
 export function NodeDetailPanel({
+  onEnterAnalyticalPipeline,
   onEnterArchive,
+  onEnterKnowledgeGraph,
   onEnterExocortex,
   onOpenSaturnRadar,
   isRAGOpen,
 }: NodeDetailPanelProps) {
-  const router = useRouter();
   const focusedPlanet = useSolarStore((state) => state.focusedPlanet);
   const setFocusedPlanet = useSolarStore((state) => state.setFocusedPlanet);
 
@@ -28,13 +30,13 @@ export function NodeDetailPanel({
   const handleEnterSystem = () => {
     switch (focusedPlanet.module) {
       case "analytical-pipeline":
-        router.push("/analytical-pipeline");
+        onEnterAnalyticalPipeline();
         break;
       case "archive":
         onEnterArchive();
         break;
       case "knowledge-graph":
-        router.push("/knowledge-graph");
+        onEnterKnowledgeGraph();
         break;
       case "exocortex":
         onEnterExocortex();
@@ -46,7 +48,7 @@ export function NodeDetailPanel({
 
   const isNeptune = focusedPlanet.name === "Neptune";
   const isSaturn = focusedPlanet.name === "Saturn";
-  const panelTitle = isNeptune ? "Neptune - Exocortex" : focusedPlanet.name.toUpperCase();
+  const panelTitle = isNeptune ? "Neptune" : focusedPlanet.name.toUpperCase();
   const panelDescription = isNeptune
     ? "The outermost gas giant of the solar system, now serving as the deep knowledge base gateway for the Exocortex."
     : isSaturn
@@ -146,7 +148,7 @@ export function NodeDetailPanel({
             className="mb-3 w-full"
             onClick={handleEnterSystem}
           >
-            ENTER SYSTEM
+            Enter System
           </CyberButton>
         )}
 
@@ -155,7 +157,7 @@ export function NodeDetailPanel({
           onClick={() => setFocusedPlanet(null)}
           className="w-full"
         >
-          BACK TO GALAXY
+          Back to Galaxy
         </CyberButton>
       </div>
     </GlassPanel>

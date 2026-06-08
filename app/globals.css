@@ -52,3 +52,52 @@ html, body, #__next {
   height: 0;
   pointer-events: none;
 }
+
+/* Galaxy terminal HUD */
+.text-shadow-glow {
+  text-shadow:
+    0 0 8px rgba(52, 211, 153, 0.5),
+    0 0 20px rgba(34, 211, 238, 0.25);
+}
+
+@keyframes terminal-scan {
+  0% {
+    transform: translateY(-100%);
+    opacity: 0;
+  }
+  30% {
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(400%);
+    opacity: 0;
+  }
+}
+
+.terminal-scanline {
+  animation: terminal-scan 1.2s ease-in-out infinite;
+}
+
+@keyframes terminal-scroll-up {
+  0% {
+    transform: translateY(0);
+  }
+  100% {
+    transform: translateY(-8px);
+  }
+}
+
+.terminal-scroll {
+  animation: terminal-scroll-up 6s ease-in-out infinite alternate;
+}
+
+.terminal-cmd-btn {
+  clip-path: polygon(
+    0 0,
+    calc(100% - 8px) 0,
+    100% 8px,
+    100% 100%,
+    8px 100%,
+    0 calc(100% - 8px)
+  );
+}

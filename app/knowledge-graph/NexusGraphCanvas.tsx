@@ -27,6 +27,7 @@ const ForceGraph2D = dynamic<ForceGraphProps<NexusNode, NexusLink>>(
 
 interface NexusGraphCanvasProps {
   graphData: NexusGraphData;
+  fullBleed?: boolean;
 }
 
 interface LinkForce {
@@ -58,7 +59,7 @@ function getNodeRadius(node: NodeObject<NexusNode>, isFocused: boolean) {
   return isFocused ? baseRadius + 3 : baseRadius;
 }
 
-export function NexusGraphCanvas({ graphData }: NexusGraphCanvasProps) {
+export function NexusGraphCanvas({ graphData, fullBleed = false }: NexusGraphCanvasProps) {
   const router = useRouter();
   const containerRef = useRef<HTMLDivElement>(null);
   const graphRef = useRef<ForceGraphMethods<NexusNode, NexusLink> | undefined>(undefined);
@@ -151,13 +152,21 @@ export function NexusGraphCanvas({ graphData }: NexusGraphCanvasProps) {
   };
 
   return (
-    <section className="relative min-h-[calc(100vh-9rem)]">
+    <section className={fullBleed ? "relative min-h-screen" : "relative min-h-[calc(100vh-9rem)]"}>
       <div
         ref={containerRef}
-        className="relative min-h-[calc(100vh-9rem)] overflow-hidden rounded border border-white/10 bg-zinc-950/80"
+        className={`relative overflow-hidden bg-zinc-950/80 ${
+          fullBleed
+            ? "min-h-screen"
+            : "min-h-[calc(100vh-9rem)] rounded border border-white/10"
+        }`}
       >
         {graphData.nodes.length === 0 ? (
-          <div className="flex h-full min-h-[calc(100vh-9rem)] items-center justify-center px-6 text-center text-sm leading-6 text-white/40">
+          <div
+            className={`flex h-full items-center justify-center px-6 text-center text-sm leading-6 text-white/40 ${
+              fullBleed ? "min-h-screen" : "min-h-[calc(100vh-9rem)]"
+            }`}
+          >
             The Nexus is empty. Archive a completed analytical session to seed the graph.
           </div>
         ) : mounted ? (

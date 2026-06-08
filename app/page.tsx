@@ -4,17 +4,46 @@ import { memo, useCallback, useEffect, useMemo, useState } from "react";
 import { Canvas } from "@react-three/fiber";
 // ✨ 引入 Environment 组件
 import { OrbitControls, Stars, Environment } from "@react-three/drei";
-import { AnimatePresence, motion } from "framer-motion";
 import { CoreStar } from "@/src/components/canvas/CoreStar";
 import { PLANETS, SolarSystem } from "@/src/components/canvas/SolarSystem";
 import { CameraController } from "@/src/components/canvas/CameraController";
 import { NodeDetailPanel } from "@/src/components/hud/NodeDetailPanel";
 import { ArchivePanel } from "@/src/components/hud/ArchivePanel";
+import { GalaxyTerminalHUD } from "@/src/components/hud/GalaxyTerminalHUD";
 import { SunConsole } from "@/src/components/hud/SunConsole";
 import { SaturnConsole } from "@/src/components/hud/SaturnConsole";
-import { GalaxyWorkspace } from "@/src/components/galaxy-workspace";
+import { SystemFrameConsole } from "@/src/components/hud/SystemFrameConsole";
 import { useSolarStore } from "@/src/store/solarStore";
 import { useDevRenderCounter } from "@/src/lib/dev-render-profiler";
+
+type ActiveSystem =
+  | "analytical-pipeline"
+  | "archive"
+  | "knowledge-graph"
+  | "exocortex"
+  | "saturn"
+  | null;
+
+const SYSTEM_FRAMES: Record<
+  Exclude<ActiveSystem, "archive" | "saturn" | null>,
+  { eyebrow: string; title: string; src: string }
+> = {
+  "analytical-pipeline": {
+    eyebrow: "MARS // EXOCORTEX CRUCIBLE",
+    title: "The Crucible",
+    src: "/analytical-pipeline?embed=1",
+  },
+  "knowledge-graph": {
+    eyebrow: "JUPITER // NEXUS GRAPH",
+    title: "The Nexus",
+    src: "/knowledge-graph?embed=1",
+  },
+  exocortex: {
+    eyebrow: "NEPTUNE // RAG HUB",
+    title: "Exocortex",
+    src: "/exocortex",
+  },
+};
 
 function WebGLWarning() {
   return (
@@ -96,10 +125,8 @@ export default function Home() {
   const focusedPlanet = useSolarStore((state) => state.focusedPlanet);
   const setFocusedPlanet = useSolarStore((state) => state.setFocusedPlanet);
   const [webglLost, setWebglLost] = useState(false);
-  const [showArchive, setShowArchive] = useState(false);
-  const [isRAGOpen, setIsRAGOpen] = useState(false);
-  const [showSunConsole, setShowSunConsole] = useState(false);
-  const [showSaturnRadar, setShowSaturnRadar] = useState(false);
+  const [isConsoleOpen, setIsConsoleOpen] = useState(false);
+  const [activeSystem, setActiveSystem] = useState<ActiveSystem>(null);
   const orbitTarget = useMemo<[number, number, number]>(() => [0, 0, 0], []);
 
   const handleContextLost = useCallback((event: Event) => {
@@ -126,19 +153,17 @@ export default function Home() {
     };
   }, [handleContextLost, handleContextRestored]);
 
-  const isRAGVisible = isRAGOpen && focusedPlanet?.name === "Neptune";
-
   useEffect(() => {
-    if (focusedPlanet?.name !== "Saturn") {
-      setShowSaturnRadar(false);
+    if (focusedPlanet?.name !== "Saturn" && activeSystem === "saturn") {
+      setActiveSystem(null);
     }
-  }, [focusedPlanet?.name]);
+  }, [activeSystem, focusedPlanet?.name]);
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
-        setShowSunConsole(false);
-        setShowSaturnRadar(false);
+        setIsConsoleOpen(false);
+        setActiveSystem(null);
       }
     };
 
@@ -146,6 +171,25 @@ export default function Home() {
     return () => {
       window.removeEventListener("keydown", onKeyDown);
     };
+  }, []);
+
+  useEffect(() => {
+    const onMessage = (event: MessageEvent) => {
+      if (event.origin !== window.location.origin) {
+        return;
+      }
+      if (
+        typeof event.data === "object" &&
+        event.data !== null &&
+        "type" in event.data &&
+        event.data.type === "knowledge-galaxy:close-system"
+      ) {
+        setActiveSystem(null);
+      }
+    };
+
+    window.addEventListener("message", onMessage);
+    return () => window.removeEventListener("message", onMessage);
   }, []);
 
   const handleSunConsolePlanetSelect = useCallback(
@@ -157,12 +201,12 @@ export default function Home() {
         return;
       }
       setFocusedPlanet(selectedPlanet);
-      setShowSunConsole(false);
+      setIsConsoleOpen(false);
     },
     [setFocusedPlanet]
   );
   const handleSunClick = useCallback(() => {
-    setShowSunConsole(true);
+    setIsConsoleOpen(true);
   }, []);
 
   useEffect(() => {
@@ -182,16 +226,23 @@ export default function Home() {
     return () => window.removeEventListener("hashchange", applyHashFocus);
   }, [setFocusedPlanet]);
 
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const system = new URLSearchParams(window.location.search).get("system");
+    if (system !== "archive") return;
+
+    const earth = PLANETS.find((planet) => planet.name === "Earth");
+    if (earth) {
+      setFocusedPlanet(earth);
+    }
+    setActiveSystem("archive");
+  }, [setFocusedPlanet]);
+
   return (
     <main className="relative h-screen w-screen bg-black">
       {webglLost && <WebGLWarning />}
       
-      <div className="pointer-events-none absolute inset-0 z-10 flex flex-col p-8 text-white">
-        <h1 className="font-serif text-2xl tracking-widest text-white/50">A SPACE</h1>
-        <p className="mt-2 text-xs tracking-wider text-white/30">
-          {focusedPlanet ? "Click Back to Galaxy to return" : "Drag to rotate • Scroll to zoom • Click planet to focus"}
-        </p>
-      </div>
+      <GalaxyTerminalHUD />
 
       <MemoizedScene
         hasFocusedPlanet={focusedPlanet !== null}
@@ -199,62 +250,49 @@ export default function Home() {
         onSunClick={handleSunClick}
       />
 
-      <NodeDetailPanel
-        onEnterArchive={() => setShowArchive(true)}
-        onEnterExocortex={() => {
-          setShowArchive(false);
-          setIsRAGOpen(true);
-        }}
-        onOpenSaturnRadar={() => setShowSaturnRadar(true)}
-        isRAGOpen={isRAGVisible}
-      />
+      {!activeSystem && (
+        <NodeDetailPanel
+          onEnterAnalyticalPipeline={() => setActiveSystem("analytical-pipeline")}
+          onEnterArchive={() => setActiveSystem("archive")}
+          onEnterKnowledgeGraph={() => setActiveSystem("knowledge-graph")}
+          onEnterExocortex={() => setActiveSystem("exocortex")}
+          onOpenSaturnRadar={() => setActiveSystem("saturn")}
+          isRAGOpen={activeSystem === "exocortex"}
+        />
+      )}
 
-      {showArchive && (
-        <ArchivePanel onClose={() => setShowArchive(false)} />
+      {activeSystem === "archive" && (
+        <ArchivePanel onClose={() => setActiveSystem(null)} />
       )}
 
       <SunConsole
-        isOpen={showSunConsole}
-        onClose={() => setShowSunConsole(false)}
+        isOpen={isConsoleOpen}
+        onClose={() => setIsConsoleOpen(false)}
         onPlanetSelect={handleSunConsolePlanetSelect}
       />
 
       <SaturnConsole
-        isOpen={showSaturnRadar}
-        onClose={() => setShowSaturnRadar(false)}
+        isOpen={activeSystem === "saturn"}
+        onClose={() => setActiveSystem(null)}
       />
 
-      <AnimatePresence>
-        {isRAGVisible && (
-          <motion.aside
-            className="absolute inset-y-0 right-0 z-30 flex h-full h-screen w-full max-w-[min(1100px,95vw)] flex-col border-l border-cyan-300/20 bg-black/95 shadow-[-24px_0_80px_rgba(0,0,0,0.6)]"
-            initial={{ x: "100%" }}
-            animate={{ x: 0 }}
-            exit={{ x: "100%" }}
-            transition={{ type: "spring", stiffness: 120, damping: 20 }}
-          >
-            <button
-              aria-label="Close Exocortex panel"
-              className="absolute right-4 top-4 z-40 inline-flex h-8 w-8 items-center justify-center rounded-full border border-white/15 bg-black/60 text-white/65 transition-colors hover:text-white"
-              onClick={() => setIsRAGOpen(false)}
-              type="button"
-            >
-              <svg
-                aria-hidden="true"
-                className="h-4 w-4"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                viewBox="0 0 24 24"
-              >
-                <path d="M18 6L6 18" />
-                <path d="M6 6l12 12" />
-              </svg>
-            </button>
-            <GalaxyWorkspace />
-          </motion.aside>
+      {activeSystem &&
+        activeSystem !== "archive" &&
+        activeSystem !== "saturn" && (
+          <SystemFrameConsole
+            isOpen
+            onClose={() => setActiveSystem(null)}
+            src={SYSTEM_FRAMES[activeSystem].src}
+            title={SYSTEM_FRAMES[activeSystem].title}
+            eyebrow={SYSTEM_FRAMES[activeSystem].eyebrow}
+            fullBleed={activeSystem === "knowledge-graph"}
+            borderClassName={
+              activeSystem === "knowledge-graph"
+                ? "border-cyan-200/45 shadow-[0_0_90px_rgba(34,211,238,0.22)]"
+                : undefined
+            }
+          />
         )}
-      </AnimatePresence>
     </main>
   );
 }
