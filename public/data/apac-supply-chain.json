@@ -1,0 +1,70 @@
+{
+  "generatedAt": "2026-06-09T13:57:16.010Z",
+  "sourceCount": 6,
+  "candidatesCount": 7,
+  "items": [
+    {
+      "id": 1,
+      "label": "中国供应链",
+      "subtitle": "CNBC Asia · cnbc.com",
+      "value": "China's May shipments to U.S. clock 5-year…",
+      "metricLabel": "Maritime Signal",
+      "icon": "port",
+      "variant": "positive",
+      "url": "https://www.cnbc.com/2026/06/09/china-trade-exports-imports-iran-war.html",
+      "publishedAt": "2026-06-09T09:02:27.000Z"
+    },
+    {
+      "id": 2,
+      "label": "亚太航运",
+      "subtitle": "Hellenic Shipping News · hellenicshippingnews.com",
+      "value": "Coal Jumps as Indonesia Tightens Export Cur…",
+      "metricLabel": "Maritime Signal",
+      "icon": "port",
+      "variant": "warning",
+      "url": "https://www.hellenicshippingnews.com/coal-jumps-as-indonesia-tightens-export-curbs/",
+      "publishedAt": "2026-06-09T10:00:33.000Z"
+    },
+    {
+      "id": 3,
+      "label": "中国供应链",
+      "subtitle": "Hellenic Shipping News · hellenicshippingnews.com",
+      "value": "Copper Steadies on Strong China Data",
+      "metricLabel": "Maritime Signal",
+      "icon": "port",
+      "variant": "positive",
+      "url": "https://www.hellenicshippingnews.com/copper-steadies-on-strong-china-data/",
+      "publishedAt": "2026-06-09T10:00:31.000Z"
+    },
+    {
+      "id": 4,
+      "label": "韩国制造链",
+      "subtitle": "Splash 247 · splash247.com",
+      "value": "International Seaways lines up LR1 newbuild…",
+      "metricLabel": "Maritime Signal",
+      "icon": "port",
+      "url": "https://splash247.com/international-seaways-lines-up-lr1-newbuilds-in-south-korea/",
+      "publishedAt": "2026-06-09T12:40:00.000Z"
+    },
+    {
+      "id": 5,
+      "label": "新加坡枢纽",
+      "subtitle": "Splash 247 · splash247.com",
+      "value": "Cargo giants back Splash Singapore debut",
+      "metricLabel": "Maritime Signal",
+      "icon": "port",
+      "url": "https://splash247.com/cargo-giants-back-splash-singapore-debut/",
+      "publishedAt": "2026-06-09T07:45:15.000Z"
+    },
+    {
+      "id": 6,
+      "label": "日本供应链",
+      "subtitle": "Hellenic Shipping News · hellenicshippingnews.com",
+      "value": "LNG shipping stocks: Japanese rise",
+      "metricLabel": "Maritime Signal",
+      "icon": "port",
+      "url": "https://www.hellenicshippingnews.com/lng-shipping-stocks-japanese-rise/",
+      "publishedAt": "2026-06-09T10:00:51.000Z"
+    }
+  ]
+}

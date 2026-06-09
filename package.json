@@ -5,6 +5,7 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
+    "fetch:apac-supply-chain": "node scripts/fetch-apac-supply-chain.mjs",
     "start": "next start",
     "lint": "eslint",
     "test": "vitest"

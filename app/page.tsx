@@ -4,9 +4,11 @@ import { memo, useCallback, useEffect, useMemo, useState } from "react";
 import { Canvas } from "@react-three/fiber";
 // ✨ 引入 Environment 组件
 import { OrbitControls, Stars, Environment } from "@react-three/drei";
+import * as THREE from "three";
 import { CoreStar } from "@/src/components/canvas/CoreStar";
 import { PLANETS, SolarSystem } from "@/src/components/canvas/SolarSystem";
 import { CameraController } from "@/src/components/canvas/CameraController";
+import { SolarBloom } from "@/src/components/canvas/SolarBloom";
 import { NodeDetailPanel } from "@/src/components/hud/NodeDetailPanel";
 import { ArchivePanel } from "@/src/components/hud/ArchivePanel";
 import { GalaxyTerminalHUD } from "@/src/components/hud/GalaxyTerminalHUD";
@@ -75,6 +77,8 @@ const Scene = ({ hasFocusedPlanet, orbitTarget, onSunClick }: SceneProps) => {
         preserveDrawingBuffer: true,
       }}
       onCreated={({ gl }) => {
+        gl.toneMapping = THREE.ACESFilmicToneMapping;
+        gl.toneMappingExposure = 0.92;
         gl.getContext().canvas.addEventListener("webglcontextlost", (e) => {
           e.preventDefault();
           console.warn("WebGL context lost inside R3F Canvas");
@@ -114,6 +118,7 @@ const Scene = ({ hasFocusedPlanet, orbitTarget, onSunClick }: SceneProps) => {
       <CameraController />
       <CoreStar onSunClick={onSunClick} />
       <SolarSystem />
+      <SolarBloom />
     </Canvas>
   );
 };
