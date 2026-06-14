@@ -16,6 +16,22 @@ bun dev
 
 Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
 
+## Supabase Types
+
+`src/lib/database.types.ts` is generated from Supabase schema metadata. Regenerate it after changing migrations:
+
+```bash
+SUPABASE_PROJECT_ID=<project-ref> npm run supabase:types
+```
+
+For a local Supabase stack:
+
+```bash
+npm run supabase:types:local
+```
+
+You can also use `SUPABASE_DB_URL` for a direct Postgres connection.
+
 You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
 
 This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
