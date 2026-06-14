@@ -17,7 +17,7 @@ import subprocess
 import sys
 import time
 from dataclasses import dataclass
-from typing import Optional, TypedDict
+from typing import Any, Optional, TypeVar, TypedDict
 try:
     import ebooklib
     from ebooklib import epub
@@ -61,11 +61,15 @@ def get_required_env(name: str) -> str:
     return value
 
 
-def require_dependency(value: object | None, package_name: str) -> None:
+T = TypeVar("T")
+
+
+def require_dependency(value: T | None, package_name: str) -> T:
     if value is None:
         raise RuntimeError(
             f"Missing Python dependency: {package_name}. Install with `pip install -r requirements.txt`."
         )
+    return value
 
 
 EMBEDDING_MODEL = "BAAI/bge-m3"
@@ -74,38 +78,38 @@ DEEPSEEK_MODEL = os.environ.get("DEEPSEEK_MODEL", "deepseek-v4-pro")
 REQUEST_RETRIES = int(os.environ.get("INGEST_REQUEST_RETRIES", "3"))
 RETRY_BASE_SECONDS = float(os.environ.get("INGEST_RETRY_BASE_SECONDS", "1.2"))
 
-embedding_client: OpenAI | None = None
-llm_client: OpenAI | None = None
-supabase_client = None
+embedding_client: Any | None = None
+llm_client: Any | None = None
+supabase_client: Any | None = None
 
 
-def get_embedding_client() -> OpenAI:
+def get_embedding_client() -> Any:
     global embedding_client
-    require_dependency(OpenAI, "openai")
+    openai_client_class = require_dependency(OpenAI, "openai")
     if embedding_client is None:
-        embedding_client = OpenAI(
+        embedding_client = openai_client_class(
             api_key=get_required_env("SILICONFLOW_API_KEY"),
             base_url="https://api.siliconflow.cn/v1",
         )
     return embedding_client
 
 
-def get_llm_client() -> OpenAI:
+def get_llm_client() -> Any:
     global llm_client
-    require_dependency(OpenAI, "openai")
+    openai_client_class = require_dependency(OpenAI, "openai")
     if llm_client is None:
-        llm_client = OpenAI(
+        llm_client = openai_client_class(
             api_key=get_required_env("DEEPSEEK_API_KEY"),
             base_url="https://api.deepseek.com",
         )
     return llm_client
 
 
-def get_supabase_client():
+def get_supabase_client() -> Any:
     global supabase_client
-    require_dependency(create_client, "supabase")
+    supabase_client_factory = require_dependency(create_client, "supabase")
     if supabase_client is None:
-        supabase_client = create_client(
+        supabase_client = supabase_client_factory(
             get_required_env("SUPABASE_URL"),
             get_required_env("SUPABASE_KEY"),
         )
@@ -206,16 +210,16 @@ def compute_file_sha256(path: str) -> str:
     return digest.hexdigest()
 
 def parse_epub(epub_path: str) -> list[Chapter]:
-    require_dependency(ebooklib, "EbookLib")
-    require_dependency(epub, "EbookLib")
-    require_dependency(BeautifulSoup, "beautifulsoup4")
-    book = epub.read_epub(epub_path)
+    ebooklib_module = require_dependency(ebooklib, "EbookLib")
+    epub_module = require_dependency(epub, "EbookLib")
+    soup_class = require_dependency(BeautifulSoup, "beautifulsoup4")
+    book = epub_module.read_epub(epub_path)
     chapters = []
     chapter_index = 0
 
     # 遍历 EPUB 里的每一个 HTML 页面
-    for item in book.get_items_of_type(ebooklib.ITEM_DOCUMENT):
-        soup = BeautifulSoup(item.get_content(), "html.parser")
+    for item in book.get_items_of_type(ebooklib_module.ITEM_DOCUMENT):
+        soup = soup_class(item.get_content(), "html.parser")
 
         # 尝试找个标题，如果没有，就用无名章节代替
         heading = soup.find(["h1", "h2", "h3", "title"])
@@ -604,11 +608,14 @@ def existing_book_ids(book_title: str, author: str) -> list[str]:
     )
     rows = result.data if isinstance(result.data, list) else []
 
-    return [
-        row["id"]
-        for row in rows
-        if isinstance(row, dict) and isinstance(row.get("id"), str)
-    ]
+    book_ids: list[str] = []
+    for row in rows:
+        if not isinstance(row, dict):
+            continue
+        row_id = row.get("id")
+        if isinstance(row_id, str):
+            book_ids.append(row_id)
+    return book_ids
 
 
 def ensure_not_duplicate(
