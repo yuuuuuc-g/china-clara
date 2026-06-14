@@ -1,7 +1,8 @@
 create extension if not exists "uuid-ossp";
 create extension if not exists vector;
 
--- Knowledge Galaxy production baseline.
+-- Knowledge Galaxy production schema snapshot.
+-- Canonical change history lives in supabase/migrations/.
 -- Security posture:
 -- - Browser anon clients should not get direct write policies.
 -- - User/content tables require Supabase authenticated users or server-side service-role access.
