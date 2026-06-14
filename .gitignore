@@ -80,6 +80,7 @@ __pycache__/
 data/
 rag-pipeline/*.epub
 rag-pipeline/*.epub/
+supabase/.temp/
 
 # ─────────────────────────────────────────────
 # 12. Local Agent/Scratch State

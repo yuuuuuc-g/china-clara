@@ -111,8 +111,8 @@ export class RagRepository {
   async listBooks(): Promise<RagBook[]> {
     const { data, error } = await this.supabase
       .from("rag_books")
-      .select("id, title, author, total_chunks, created_at, updated_at")
-      .order("updated_at", { ascending: false });
+      .select("id, title, author, total_chunks, created_at")
+      .order("created_at", { ascending: false });
 
     if (error) {
       fail(error.message, "Unable to load local knowledge books.");
@@ -137,9 +137,9 @@ export class RagRepository {
   async searchChunks(input: SearchChunksInput): Promise<RagSearchResult[]> {
     const { data, error } = await this.supabase.rpc("hybrid_search", {
       query_text: input.query,
-      query_embedding: input.queryEmbedding,
+      query_embedding: toPgVector(input.queryEmbedding),
       match_count: input.matchCount,
-      book_uuid_param: input.bookUuid && input.bookUuid.length > 0 ? input.bookUuid : null,
+      ...(input.bookUuid && input.bookUuid.length > 0 ? { book_uuid_param: input.bookUuid } : {}),
     });
 
     if (error) {
@@ -160,6 +160,10 @@ export class RagRepository {
       preview: toCitationPreview(result.content),
     }));
   }
+}
+
+function toPgVector(embedding: number[]): string {
+  return `[${embedding.join(",")}]`;
 }
 
 export function createRagRepository(supabase: RagSupabaseClient): RagRepository {

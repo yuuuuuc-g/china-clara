@@ -15,7 +15,6 @@ const book: RagBook = {
   author: "F. A. Hayek",
   total_chunks: 42,
   created_at: "2026-06-14T00:00:00.000Z",
-  updated_at: "2026-06-14T00:00:00.000Z",
 };
 
 describe("RagRepository", () => {
@@ -62,9 +61,8 @@ describe("RagRepository", () => {
     ]);
     expect(rpc).toHaveBeenCalledWith("hybrid_search", {
       query_text: "institutions",
-      query_embedding: [0.1, 0.2, 0.3],
+      query_embedding: "[0.1,0.2,0.3]",
       match_count: 3,
-      book_uuid_param: null,
     });
   });
 
@@ -122,7 +120,7 @@ describe("RagRepository", () => {
 
     await expect(repository.listBooks()).resolves.toEqual([book]);
     expect(from).toHaveBeenCalledWith("rag_books");
-    expect(order).toHaveBeenCalledWith("updated_at", { ascending: false });
+    expect(order).toHaveBeenCalledWith("created_at", { ascending: false });
   });
 
   it("maps Supabase failures to a public repository error", async () => {
