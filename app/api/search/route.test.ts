@@ -213,9 +213,8 @@ describe("POST /api/search", () => {
     expect(events[4]?.data.delta).toBe("制度通过降低不确定性促进合作。");
     expect(mocks.rpc).toHaveBeenCalledWith("hybrid_search", {
       query_text: "制度经济学",
-      query_embedding: [0.1, 0.2, 0.3],
+      query_embedding: "[0.1,0.2,0.3]",
       match_count: 2,
-      book_uuid_param: null,
     });
   });
 
