@@ -104,4 +104,79 @@ describe("runIntelligencePipeline", () => {
       })
     );
   });
+
+  it("deduplicates fetched articles before batch upsert", async () => {
+    const repository: Pick<
+      IntelligenceRepository,
+      | "finishJob"
+      | "listRecentSourceArticles"
+      | "startJob"
+      | "toMacroSourceArticles"
+      | "updateModuleScanState"
+      | "upsertApacSupplyChainSignals"
+      | "upsertDailyBriefings"
+      | "upsertMacroIntelItems"
+      | "upsertSourceArticles"
+      | "upsertSources"
+    > = {
+      startJob: vi.fn().mockResolvedValue({ id: "job-1", status: "running" }),
+      finishJob: vi.fn().mockResolvedValue(undefined),
+      upsertSources: vi.fn().mockResolvedValue(undefined),
+      upsertSourceArticles: vi.fn().mockResolvedValue([article]),
+      listRecentSourceArticles: vi.fn().mockResolvedValue([article]),
+      upsertMacroIntelItems: vi.fn().mockResolvedValue(undefined),
+      upsertApacSupplyChainSignals: vi.fn().mockResolvedValue(undefined),
+      upsertDailyBriefings: vi.fn().mockResolvedValue(undefined),
+      updateModuleScanState: vi.fn().mockResolvedValue(undefined),
+      toMacroSourceArticles: (articles) =>
+        articles.map((item) => ({
+          articleId: item.articleId,
+          source: item.source,
+          title: item.title,
+          url: item.url,
+          snippet: item.snippet,
+          publishedAt: item.publishedAt,
+        })),
+    };
+
+    await runIntelligencePipeline({
+      repository,
+      fetchSources: async (sources) => [
+        {
+          source: sources[0],
+          articles: [
+            {
+              source: "First Source",
+              title: "Older duplicate",
+              url: "https://example.test/duplicate ",
+              snippet: "Short snippet",
+              publishedAt: "2026-06-15T00:00:00.000Z",
+            },
+          ],
+        },
+        {
+          source: sources[1],
+          articles: [
+            {
+              source: "Second Source",
+              title: "Newer duplicate",
+              url: " https://example.test/duplicate",
+              snippet: "Longer duplicate snippet with more useful context",
+              publishedAt: "2026-06-16T00:00:00.000Z",
+            },
+          ],
+        },
+      ],
+      now: () => new Date("2026-06-16T08:00:00.000Z"),
+    });
+
+    expect(repository.upsertSourceArticles).toHaveBeenCalledWith([
+      expect.objectContaining({
+        sourceName: "Second Source",
+        title: "Newer duplicate",
+        url: "https://example.test/duplicate",
+        snippet: "Longer duplicate snippet with more useful context",
+      }),
+    ]);
+  });
 });

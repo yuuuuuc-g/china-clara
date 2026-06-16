@@ -59,21 +59,67 @@ export interface IntelligencePipelineResult {
 const FETCH_TIMEOUT_MS = 12_000;
 const PER_SOURCE_CAP = 12;
 
+function normalizeArticleUrl(url: string): string {
+  return url.trim();
+}
+
+function publishedTime(value: string | null): number {
+  if (!value) {
+    return 0;
+  }
+
+  const timestamp = Date.parse(value);
+  return Number.isFinite(timestamp) ? timestamp : 0;
+}
+
+function shouldReplaceArticle(existing: SourceArticleInput, next: SourceArticleInput): boolean {
+  const existingPublishedTime = publishedTime(existing.publishedAt);
+  const nextPublishedTime = publishedTime(next.publishedAt);
+
+  if (nextPublishedTime !== existingPublishedTime) {
+    return nextPublishedTime > existingPublishedTime;
+  }
+
+  return next.snippet.length > existing.snippet.length;
+}
+
+function dedupeSourceArticleInputs(articles: SourceArticleInput[]): SourceArticleInput[] {
+  const byUrl = new Map<string, SourceArticleInput>();
+
+  for (const article of articles) {
+    const url = normalizeArticleUrl(article.url);
+    if (!url) {
+      continue;
+    }
+
+    const next = { ...article, url };
+    const existing = byUrl.get(url);
+
+    if (!existing || shouldReplaceArticle(existing, next)) {
+      byUrl.set(url, next);
+    }
+  }
+
+  return Array.from(byUrl.values());
+}
+
 function toSourceArticleInputs(results: IntelligenceSourceFetchResult[]): SourceArticleInput[] {
-  return results.flatMap((result) =>
-    result.articles.map((article) => ({
-      sourceId: result.source.id,
-      sourceName: article.source,
-      title: article.title,
-      url: article.url,
-      snippet: article.snippet,
-      publishedAt: article.publishedAt,
-      rawPayload: {
+  return dedupeSourceArticleInputs(
+    results.flatMap((result) =>
+      result.articles.map((article) => ({
         sourceId: result.source.id,
-        regions: result.source.regions,
-        topics: result.source.topics,
-      },
-    }))
+        sourceName: article.source,
+        title: article.title,
+        url: article.url,
+        snippet: article.snippet,
+        publishedAt: article.publishedAt,
+        rawPayload: {
+          sourceId: result.source.id,
+          regions: result.source.regions,
+          topics: result.source.topics,
+        },
+      }))
+    )
   );
 }
 
