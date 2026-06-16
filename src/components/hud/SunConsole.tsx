@@ -101,6 +101,22 @@ interface RawMacroPayload {
   items?: unknown;
 }
 
+interface IngestStatusPayload {
+  status?: string;
+  articleCount?: unknown;
+  fetchedCount?: unknown;
+  insertedCount?: unknown;
+  sourceCount?: unknown;
+  finishedAt?: unknown;
+}
+
+interface DailyArticleStats {
+  articleCount: number | null;
+  insertedCount: number | null;
+  sourceCount: number | null;
+  finishedAt: string | null;
+}
+
 type PlanetNavStatus = "online" | "standby";
 
 interface PlanetNavItem {
@@ -155,6 +171,7 @@ const INITIAL_MICRO_CHARTS: MicroChartState = {
 
 const APAC_REFRESH_INTERVAL_MS = 60 * 60 * 1000;
 const MACRO_INTEL_REFRESH_INTERVAL_MS = 60 * 60 * 1000;
+const INTELLIGENCE_STATUS_REFRESH_INTERVAL_MS = 60 * 60 * 1000;
 
 const CHAMFER_STYLE: CSSProperties = {
   clipPath:
@@ -312,6 +329,10 @@ const APAC_UPDATED_AT_FORMATTER = new Intl.DateTimeFormat("en-GB", {
   timeZone: "Asia/Shanghai",
 });
 
+const ARTICLE_COUNT_FORMATTER = new Intl.NumberFormat("en-US", {
+  maximumFractionDigits: 0,
+});
+
 function panelClassName(extra = "") {
   return `relative overflow-hidden border border-cyan-500/30 bg-slate-950/70 shadow-[0_0_28px_rgba(6,182,212,0.12),inset_0_0_32px_rgba(8,145,178,0.08)] ${extra}`;
 }
@@ -419,6 +440,40 @@ function formatApacUpdatedAt(value: string | null) {
 
 function formatMacroGeneratedAt(value: string | null) {
   return formatApacUpdatedAt(value);
+}
+
+function numberOrNull(value: unknown) {
+  return typeof value === "number" && Number.isFinite(value) ? value : null;
+}
+
+function stringOrNull(value: unknown) {
+  return typeof value === "string" ? value : null;
+}
+
+function toDailyArticleStats(payload: IngestStatusPayload): DailyArticleStats {
+  const fetchedCount = numberOrNull(payload.fetchedCount);
+  const articleCount = numberOrNull(payload.articleCount) ?? fetchedCount;
+
+  return {
+    articleCount,
+    insertedCount: numberOrNull(payload.insertedCount),
+    sourceCount: numberOrNull(payload.sourceCount),
+    finishedAt: stringOrNull(payload.finishedAt),
+  };
+}
+
+function formatArticleCount(value: number | null) {
+  return value === null ? "--" : ARTICLE_COUNT_FORMATTER.format(value);
+}
+
+function buildDailyArticlePulse(count: number | null) {
+  const safeCount = count ?? 0;
+  const baseline = Math.max(12, Math.min(84, safeCount / 3));
+
+  return Array.from({ length: 10 }, (_, index) => {
+    const wave = ((safeCount + index * 17) % 48) - 18;
+    return clamp(Math.round(baseline + wave), 12, 88);
+  });
 }
 
 function hasReadableUrl(item: SupplyItem) {
@@ -579,6 +634,12 @@ export function SunConsole({ isOpen, onClose, onPlanetSelect }: SunConsoleProps)
   const [hoveredPlanetId, setHoveredPlanetId] = useState<string | null>(null);
   const [macroIntelItems, setMacroIntelItems] = useState<MacroIntelItem[]>([]);
   const [macroIntelGeneratedAt, setMacroIntelGeneratedAt] = useState<string | null>(null);
+  const [dailyArticleStats, setDailyArticleStats] = useState<DailyArticleStats>({
+    articleCount: null,
+    insertedCount: null,
+    sourceCount: null,
+    finishedAt: null,
+  });
   const [supplyItems, setSupplyItems] = useState<SupplyItem[]>([]);
   const [supplyGeneratedAt, setSupplyGeneratedAt] = useState<string | null>(null);
   const [beijingTime, setBeijingTime] = useState(() =>
@@ -753,6 +814,60 @@ export function SunConsole({ isOpen, onClose, onPlanetSelect }: SunConsoleProps)
   }, [isOpen]);
 
   useEffect(() => {
+    if (!isOpen || typeof fetch !== "function") {
+      return;
+    }
+
+    let isDisposed = false;
+    let controller: AbortController | null = null;
+
+    async function loadDailyArticleStats() {
+      controller?.abort();
+      const requestController = new AbortController();
+      controller = requestController;
+
+      try {
+        const timestamp = Date.now();
+        const response = await fetch(`/api/intelligence-ingest-status?t=${timestamp}`, {
+          cache: "no-store",
+          signal: requestController.signal,
+        });
+        if (!response.ok) {
+          throw new Error(`Intelligence ingest status returned ${response.status}`);
+        }
+
+        const payload = (await response.json()) as IngestStatusPayload;
+
+        if (!isDisposed) {
+          setDailyArticleStats(toDailyArticleStats(payload));
+        }
+      } catch (error) {
+        if (!requestController.signal.aborted && !isDisposed) {
+          console.warn("[SunConsole] intelligence ingest status unavailable", error);
+          setDailyArticleStats({
+            articleCount: null,
+            insertedCount: null,
+            sourceCount: null,
+            finishedAt: null,
+          });
+        }
+      }
+    }
+
+    loadDailyArticleStats();
+    const refreshTimerId = window.setInterval(
+      loadDailyArticleStats,
+      INTELLIGENCE_STATUS_REFRESH_INTERVAL_MS
+    );
+
+    return () => {
+      isDisposed = true;
+      window.clearInterval(refreshTimerId);
+      controller?.abort();
+    };
+  }, [isOpen]);
+
+  useEffect(() => {
     const timerId = window.setInterval(() => {
       setMicroCharts((current) => ({
         sourceCoverage: current.sourceCoverage,
@@ -773,6 +888,8 @@ export function SunConsole({ isOpen, onClose, onPlanetSelect }: SunConsoleProps)
       window.clearInterval(timerId);
     };
   }, []);
+
+  const dailyArticlePulse = buildDailyArticlePulse(dailyArticleStats.articleCount);
 
   return (
     <AnimatePresence>
@@ -1120,18 +1237,26 @@ export function SunConsole({ isOpen, onClose, onPlanetSelect }: SunConsoleProps)
                     style={CHAMFER_STYLE}
                   >
                     <div className="grid place-items-center">
-                      <div className="grid h-16 w-16 place-items-center rounded-full border-[7px] border-emerald-300 border-r-cyan-950 bg-emerald-400/10 font-mono text-xl text-emerald-300 shadow-[0_0_24px_rgba(52,211,153,0.24)]">
-                        92%
+                      <div className="grid h-16 w-16 place-items-center rounded-full border-[7px] border-cyan-300 border-r-cyan-950 bg-cyan-400/10 px-1 text-center font-mono text-lg leading-none text-cyan-200 shadow-[0_0_24px_rgba(34,211,238,0.24)]">
+                        {formatArticleCount(dailyArticleStats.articleCount)}
                       </div>
-                      <div className="mt-1 font-mono text-[8px] uppercase tracking-widest text-slate-500">Health Index</div>
+                      <div className="mt-1 font-mono text-[8px] uppercase tracking-widest text-slate-500">Articles</div>
                     </div>
                     <div>
-                      <div className="font-mono text-[11px] uppercase tracking-wider text-cyan-300">供应链健康度 / Supply Chain Health</div>
+                      <div className="font-mono text-[11px] uppercase tracking-wider text-cyan-300">每日文章更新 / Daily Article Updates</div>
+                      <div className="mt-1 font-mono text-[8px] uppercase tracking-widest text-slate-500">
+                        {dailyArticleStats.finishedAt
+                          ? `Last ingest ${formatApacUpdatedAt(dailyArticleStats.finishedAt)} BJT`
+                          : "Awaiting ingest status"}
+                        {dailyArticleStats.sourceCount !== null
+                          ? ` · ${dailyArticleStats.sourceCount} sources`
+                          : ""}
+                      </div>
                       <div className="mt-3 flex h-16 items-end gap-2 border-b border-l border-cyan-900/60 px-2">
-                        {[52, 36, 68, 54, 31, 28, 38, 24, 42, 72].map((height, index) => (
+                        {dailyArticlePulse.map((height, index) => (
                           <span key={index} className="relative h-full flex-1">
                             <span
-                              className="absolute bottom-0 left-1/2 h-1.5 w-1.5 -translate-x-1/2 rounded-full bg-emerald-300 shadow-[0_0_10px_rgba(52,211,153,0.75)]"
+                              className="absolute bottom-0 left-1/2 h-1.5 w-1.5 -translate-x-1/2 rounded-full bg-cyan-300 shadow-[0_0_10px_rgba(34,211,238,0.75)]"
                               style={{ bottom: `${height}%` }}
                             />
                           </span>

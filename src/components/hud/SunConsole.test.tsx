@@ -298,6 +298,72 @@ describe("SunConsole", () => {
     expect(articleLink?.getAttribute("rel")).toBe("noreferrer");
   });
 
+  it("shows the latest daily article update count from the ingest status API", async () => {
+    const fetchMock = vi.fn((url: string) => {
+      if (url.startsWith("/api/intelligence-ingest-status")) {
+        return Promise.resolve({
+          ok: true,
+          json: async () => ({
+            status: "completed",
+            articleCount: 184,
+            fetchedCount: 184,
+            insertedCount: 184,
+            sourceCount: 19,
+            finishedAt: "2026-06-17T07:01:00.000Z",
+          }),
+        });
+      }
+
+      if (url.startsWith("/api/macro-intel")) {
+        return Promise.resolve({
+          ok: true,
+          json: async () => ({
+            generatedAt: "2026-06-09T03:04:05.000Z",
+            items: [],
+          }),
+        });
+      }
+
+      if (url.startsWith("/api/macro-raw-articles")) {
+        return Promise.resolve({
+          ok: true,
+          json: async () => ({
+            generatedAt: "2026-06-09T03:04:05.000Z",
+            sourceCount: 19,
+            successfulSourceCount: 19,
+            candidatesCount: 12,
+            items: [],
+          }),
+        });
+      }
+
+      return Promise.resolve({
+        ok: true,
+        json: async () => ({
+          generatedAt: "2026-06-09T03:04:05.000Z",
+          items: [],
+        }),
+      });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    renderSunConsole();
+
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      expect.stringContaining("/api/intelligence-ingest-status?t="),
+      expect.objectContaining({ cache: "no-store" })
+    );
+    expect(container.textContent).toContain("每日文章更新 / Daily Article Updates");
+    expect(container.textContent).toContain("184");
+    expect(container.textContent).toContain("Last ingest 17/06, 15:01 BJT");
+    expect(container.textContent).toContain("19 sources");
+    expect(container.textContent).not.toContain("供应链健康度 / Supply Chain Health");
+  });
+
   it("loads structured macro intelligence into the intelligence board", async () => {
     const fetchMock = vi.fn((url: string) => {
       if (url.startsWith("/api/macro-intel")) {
@@ -453,14 +519,14 @@ describe("SunConsole", () => {
       await Promise.resolve();
     });
 
-    expect(fetchMock).toHaveBeenCalledTimes(3);
+    expect(fetchMock).toHaveBeenCalledTimes(4);
 
     await act(async () => {
       vi.advanceTimersByTime(60 * 60 * 1000);
       await Promise.resolve();
     });
 
-    expect(fetchMock).toHaveBeenCalledTimes(6);
+    expect(fetchMock).toHaveBeenCalledTimes(8);
   });
 
   it("allows placeholder planets to be selected from the navigation", () => {

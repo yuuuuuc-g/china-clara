@@ -28,6 +28,16 @@ export interface IntelligenceJobSummary {
   status: "running" | "completed" | "failed";
 }
 
+export interface CompletedIngestionJobSummary {
+  id: string;
+  jobType: string;
+  sourceCount: number;
+  fetchedCount: number;
+  insertedCount: number;
+  startedAt: string;
+  finishedAt: string | null;
+}
+
 interface QueryError {
   message?: string;
 }
@@ -75,6 +85,16 @@ interface ApacSignalRow {
   url?: unknown;
   published_at?: unknown;
   generated_at?: unknown;
+}
+
+interface IngestionJobRow {
+  id?: unknown;
+  job_type?: unknown;
+  source_count?: unknown;
+  fetched_count?: unknown;
+  inserted_count?: unknown;
+  started_at?: unknown;
+  finished_at?: unknown;
 }
 
 interface DailyBriefingRow {
@@ -267,6 +287,26 @@ function toApacSupplyItem(row: ApacSignalRow, index: number): ApacSupplyItem | n
   };
 }
 
+function toCompletedIngestionJob(row: IngestionJobRow): CompletedIngestionJobSummary | null {
+  const id = stringOrNull(row.id);
+  const jobType = stringOrNull(row.job_type);
+  const startedAt = stringOrNull(row.started_at);
+
+  if (!id || !jobType || !startedAt) {
+    return null;
+  }
+
+  return {
+    id,
+    jobType,
+    sourceCount: numberOrZero(row.source_count),
+    fetchedCount: numberOrZero(row.fetched_count),
+    insertedCount: numberOrZero(row.inserted_count),
+    startedAt,
+    finishedAt: stringOrNull(row.finished_at),
+  };
+}
+
 export class IntelligenceRepository {
   constructor(private readonly supabase: SupabaseClient) {}
 
@@ -325,6 +365,23 @@ export class IntelligenceRepository {
       .eq("id", input.id);
 
     if (error) fail(error, "Unable to finish intelligence job.");
+  }
+
+  async getLatestCompletedJobSummary(jobType: string): Promise<CompletedIngestionJobSummary | null> {
+    const { data, error } = await this.supabase
+      .from("ingestion_jobs")
+      .select("id, job_type, source_count, fetched_count, inserted_count, started_at, finished_at")
+      .eq("job_type", jobType)
+      .eq("status", "completed")
+      .order("finished_at", { ascending: false, nullsFirst: false })
+      .order("started_at", { ascending: false })
+      .limit(1);
+
+    if (error) fail(error, "Unable to load intelligence job summary.");
+
+    const [row] = data ?? [];
+
+    return row ? toCompletedIngestionJob(row) : null;
   }
 
   async upsertSourceArticles(articles: SourceArticleInput[]): Promise<PersistedSourceArticle[]> {
