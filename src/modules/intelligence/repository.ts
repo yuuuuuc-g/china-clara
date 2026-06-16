@@ -77,6 +77,14 @@ interface ApacSignalRow {
   generated_at?: unknown;
 }
 
+interface DailyBriefingRow {
+  date: string;
+  source: string;
+  title: string;
+  url: string;
+  ai_summary: string;
+}
+
 export class IntelligenceRepositoryError extends Error {
   constructor(message: string, readonly publicMessage = "Intelligence repository failed.") {
     super(message);
@@ -98,6 +106,44 @@ function stringArray(value: unknown): string[] {
 
 function numberOrZero(value: unknown): number {
   return typeof value === "number" && Number.isFinite(value) ? value : 0;
+}
+
+function normalizeUrl(value: string): string {
+  return value.trim();
+}
+
+function uniqueByUrl<T extends { url: string }>(items: T[]): T[] {
+  const byUrl = new Map<string, T>();
+
+  for (const item of items) {
+    const url = normalizeUrl(item.url);
+    if (!url) {
+      continue;
+    }
+
+    byUrl.set(url, { ...item, url });
+  }
+
+  return Array.from(byUrl.values());
+}
+
+function dailyBriefingKey(row: DailyBriefingRow): string {
+  return `${row.date}:${normalizeUrl(row.url)}`;
+}
+
+function uniqueDailyBriefings(rows: DailyBriefingRow[]): DailyBriefingRow[] {
+  const byKey = new Map<string, DailyBriefingRow>();
+
+  for (const row of rows) {
+    const url = normalizeUrl(row.url);
+    if (!url) {
+      continue;
+    }
+
+    byKey.set(dailyBriefingKey({ ...row, url }), { ...row, url });
+  }
+
+  return Array.from(byKey.values());
 }
 
 function toSourceArticle(row: SourceArticleRow): PersistedSourceArticle | null {
@@ -282,14 +328,15 @@ export class IntelligenceRepository {
   }
 
   async upsertSourceArticles(articles: SourceArticleInput[]): Promise<PersistedSourceArticle[]> {
-    if (articles.length === 0) {
+    const uniqueArticles = uniqueByUrl(articles);
+    if (uniqueArticles.length === 0) {
       return [];
     }
 
     const { data, error } = await this.supabase
       .from("source_articles")
       .upsert(
-        articles.map((article) => ({
+        uniqueArticles.map((article) => ({
           source_id: article.sourceId,
           source_name: article.sourceName,
           title: article.title,
@@ -321,10 +368,11 @@ export class IntelligenceRepository {
   }
 
   async upsertMacroIntelItems(items: MacroIntelItem[]): Promise<void> {
-    if (items.length === 0) return;
+    const uniqueItems = uniqueByUrl(items);
+    if (uniqueItems.length === 0) return;
 
     const { error } = await this.supabase.from("macro_intel_items").upsert(
-      items.map((item) => ({
+      uniqueItems.map((item) => ({
         article_id: item.articleId,
         title: item.title,
         source: item.source,
@@ -363,7 +411,9 @@ export class IntelligenceRepository {
   }
 
   async upsertApacSupplyChainSignals(items: ApacSupplyItem[]): Promise<void> {
-    const persistedItems = items.filter((item) => item.url);
+    const persistedItems = uniqueByUrl(
+      items.filter((item): item is ApacSupplyItem & { url: string } => typeof item.url === "string")
+    );
     if (persistedItems.length === 0) return;
 
     const { error } = await this.supabase.from("apac_supply_chain_signals").upsert(
@@ -398,13 +448,14 @@ export class IntelligenceRepository {
   }
 
   async upsertDailyBriefings(
-    rows: { date: string; source: string; title: string; url: string; ai_summary: string }[]
+    rows: DailyBriefingRow[]
   ): Promise<void> {
-    if (rows.length === 0) return;
+    const uniqueRows = uniqueDailyBriefings(rows);
+    if (uniqueRows.length === 0) return;
 
     const { error } = await this.supabase
       .from("daily_briefings")
-      .upsert(rows, { onConflict: "date,url", ignoreDuplicates: false });
+      .upsert(uniqueRows, { onConflict: "date,url", ignoreDuplicates: false });
 
     if (error) fail(error, "Unable to persist daily briefings.");
   }
