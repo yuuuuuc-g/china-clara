@@ -96,3 +96,5 @@ public/data/macro-raw-articles.json
 ctx2skill-loop.ts
 /next
 /knowledge-galaxy@*
+
+rag-pipeline/

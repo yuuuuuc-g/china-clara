@@ -149,7 +149,7 @@ def parse_args(argv: list[str]) -> IngestConfig:
     parser.add_argument(
         "--path",
         default=os.environ.get("TARGET_PATH", "rag-pipeline/经济学的思维方式.epub"),
-        help="Source file path. Supports .epub, .pdf, and .md.",
+        help="Source path. Supports .epub, .pdf, .md, and directories containing .md files.",
     )
     parser.add_argument(
         "--title",
@@ -208,6 +208,133 @@ def compute_file_sha256(path: str) -> str:
         for block in iter(lambda: file.read(1024 * 1024), b""):
             digest.update(block)
     return digest.hexdigest()
+
+
+CHINESE_DIGITS = {
+    "零": 0,
+    "〇": 0,
+    "一": 1,
+    "二": 2,
+    "两": 2,
+    "三": 3,
+    "四": 4,
+    "五": 5,
+    "六": 6,
+    "七": 7,
+    "八": 8,
+    "九": 9,
+}
+
+CHINESE_UNITS = {
+    "十": 10,
+    "百": 100,
+    "千": 1000,
+}
+
+
+def parse_chinese_integer(value: str) -> int | None:
+    if value.isdigit():
+        return int(value)
+
+    total = 0
+    current_digit = 0
+    consumed = False
+
+    for char in value:
+        if char in CHINESE_DIGITS:
+            current_digit = CHINESE_DIGITS[char]
+            consumed = True
+            continue
+
+        if char in CHINESE_UNITS:
+            unit = CHINESE_UNITS[char]
+            total += (current_digit or 1) * unit
+            current_digit = 0
+            consumed = True
+            continue
+
+        return None
+
+    if not consumed:
+        return None
+
+    return total + current_digit
+
+
+def extract_chapter_index(path: str) -> int | None:
+    stem = os.path.splitext(os.path.basename(path))[0]
+    match = re.search(r"第\s*([0-9]+|[零〇一二两三四五六七八九十百千]+)\s*[章节篇讲回]", stem)
+    if not match:
+        return None
+    return parse_chinese_integer(match.group(1))
+
+
+def markdown_directory_sort_key(path: str, base_dir: str) -> tuple[int, int, str]:
+    stem = os.path.splitext(os.path.basename(path))[0]
+    rel_path = os.path.relpath(path, base_dir)
+    chapter_index = extract_chapter_index(path)
+
+    if re.search(r"^(序|序言|前言|导言|导论)", stem):
+        return (0, 0, rel_path)
+
+    if chapter_index is not None:
+        return (1, chapter_index, rel_path)
+
+    if re.search(r"^(结语|结论|后记|附录)", stem):
+        return (3, 0, rel_path)
+
+    return (2, 0, rel_path)
+
+
+def find_markdown_files(directory_path: str) -> list[str]:
+    abs_directory_path = os.path.abspath(directory_path)
+
+    if not os.path.isdir(abs_directory_path):
+        raise NotADirectoryError(f"Markdown 目录不存在: {abs_directory_path}")
+
+    markdown_files: list[str] = []
+    for root, dirnames, filenames in os.walk(abs_directory_path):
+        dirnames[:] = sorted(
+            dirname
+            for dirname in dirnames
+            if not dirname.startswith(".") and dirname != "__MACOSX"
+        )
+        for filename in sorted(filenames):
+            if filename.startswith("."):
+                continue
+            if filename.lower().endswith(".md"):
+                markdown_files.append(os.path.join(root, filename))
+
+    if not markdown_files:
+        raise FileNotFoundError(f"Markdown 目录中没有找到 .md 文件: {abs_directory_path}")
+
+    return sorted(
+        markdown_files,
+        key=lambda path: markdown_directory_sort_key(path, abs_directory_path),
+    )
+
+
+def compute_directory_sha256(directory_path: str) -> str:
+    abs_directory_path = os.path.abspath(directory_path)
+    digest = hashlib.sha256()
+
+    for markdown_path in find_markdown_files(abs_directory_path):
+        relative_path = os.path.relpath(markdown_path, abs_directory_path)
+        digest.update(relative_path.encode("utf-8"))
+        digest.update(b"\0")
+        with open(markdown_path, "rb") as file:
+            for block in iter(lambda: file.read(1024 * 1024), b""):
+                digest.update(block)
+        digest.update(b"\0")
+
+    return digest.hexdigest()
+
+
+def compute_source_sha256(path: str) -> str:
+    if os.path.isdir(path):
+        return compute_directory_sha256(path)
+
+    return compute_file_sha256(path)
 
 def parse_epub(epub_path: str) -> list[Chapter]:
     ebooklib_module = require_dependency(ebooklib, "EbookLib")
@@ -351,6 +478,45 @@ def parse_markdown(md_path: str) -> list[MarkdownSection]:
             })
 
     print(f"[Parse] 成功解析 Markdown，共找到 {len(sections)} 个有效章节。")
+    return sections
+
+
+def parse_markdown_file_as_directory_section(md_path: str) -> MarkdownSection:
+    abs_md_path = os.path.abspath(md_path)
+
+    with open(abs_md_path, "r", encoding="utf-8") as file:
+        content = file.read().strip()
+
+    fallback_title = os.path.splitext(os.path.basename(abs_md_path))[0].strip()
+    first_heading = re.search(r"^\s*(#{1,2})\s+(.+?)\s*$", content, re.MULTILINE)
+
+    if first_heading and not content[:first_heading.start()].strip():
+        title = first_heading.group(2).strip()
+        section_content = content[first_heading.end():].strip()
+    else:
+        title = fallback_title
+        section_content = content
+
+    if not section_content:
+        section_content = title
+
+    return {
+        "chapter_title": title,
+        "content": section_content,
+    }
+
+
+def parse_markdown_directory(directory_path: str) -> list[MarkdownSection]:
+    abs_directory_path = os.path.abspath(directory_path)
+    markdown_files = find_markdown_files(abs_directory_path)
+    sections = [
+        parse_markdown_file_as_directory_section(markdown_path)
+        for markdown_path in markdown_files
+    ]
+
+    print(
+        f"[Parse] 成功解析 Markdown 目录，共找到 {len(sections)} 个章节文件。"
+    )
     return sections
 
 
@@ -732,10 +898,13 @@ if __name__ == "__main__":
     target_path_lower = config.target_path.lower()
     generated_markdown_path: str | None = None
     try:
-        source_hash = compute_file_sha256(config.target_path)
+        source_hash = compute_source_sha256(config.target_path)
         print(f"[Source] SHA256: {source_hash}")
 
-        if target_path_lower.endswith(".pdf"):
+        if os.path.isdir(config.target_path):
+            markdown_sections = parse_markdown_directory(config.target_path)
+            parsed_chapters = markdown_sections_to_chapters(markdown_sections)
+        elif target_path_lower.endswith(".pdf"):
             os.makedirs(config.marker_output_dir, exist_ok=True)
             markdown_path = convert_pdf_to_md_with_marker(
                 config.target_path,

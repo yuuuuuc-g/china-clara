@@ -31,8 +31,10 @@ sys.modules.setdefault("dotenv", dotenv_stub)
 from ingest import (
     cleanup_marker_output,
     compute_file_sha256,
+    compute_source_sha256,
     chunk_text,
     parse_args,
+    parse_markdown_directory,
     split_long_paragraph,
 )
 
@@ -119,6 +121,46 @@ class IngestUtilityTests(unittest.TestCase):
 
             self.assertFalse(os.path.exists(generated_dir))
             self.assertTrue(os.path.exists(sibling_dir))
+
+    def test_parse_markdown_directory_treats_each_file_as_a_chapter(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            first_path = os.path.join(temp_dir, "第一章 中国经济的欧洲化.md")
+            second_path = os.path.join(temp_dir, "第二章 在集聚中走向平衡.md")
+            nested_dir = os.path.join(temp_dir, "nested")
+            os.makedirs(nested_dir)
+            conclusion_path = os.path.join(nested_dir, "结语 为了公共利益.md")
+
+            with open(second_path, "w", encoding="utf-8") as file:
+                file.write("第二章正文。\n\n## 小节标题\n\n小节内容不会被拆成独立章节。")
+            with open(first_path, "w", encoding="utf-8") as file:
+                file.write("# 第一章 中国经济的欧洲化\n\n第一章正文。")
+            with open(conclusion_path, "w", encoding="utf-8") as file:
+                file.write("结语正文。")
+
+            sections = parse_markdown_directory(temp_dir)
+
+            self.assertEqual(
+                [section["chapter_title"] for section in sections],
+                ["第一章 中国经济的欧洲化", "第二章 在集聚中走向平衡", "结语 为了公共利益"],
+            )
+            self.assertIn("小节内容不会被拆成独立章节。", sections[1]["content"])
+
+    def test_compute_source_sha256_hashes_markdown_directories(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            first_path = os.path.join(temp_dir, "第一章.md")
+            second_path = os.path.join(temp_dir, "第二章.md")
+
+            with open(first_path, "w", encoding="utf-8") as file:
+                file.write("第一章")
+            with open(second_path, "w", encoding="utf-8") as file:
+                file.write("第二章")
+
+            original_hash = compute_source_sha256(temp_dir)
+
+            with open(second_path, "w", encoding="utf-8") as file:
+                file.write("第二章更新")
+
+            self.assertNotEqual(original_hash, compute_source_sha256(temp_dir))
 
 
 if __name__ == "__main__":
