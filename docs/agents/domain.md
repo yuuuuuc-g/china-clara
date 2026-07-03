@@ -1,28 +1,29 @@
 # Domain Docs
 
-How the engineering skills should consume this repo's domain documentation when exploring the codebase.
+This repo uses a single-context domain documentation layout.
 
-## Before exploring, read these
+Read these files before architecture, debugging, or test-design work:
 
-- `CONTEXT.md` at the repo root.
-- `docs/adr/` for decisions that touch the area being changed.
+- `CONTEXT.md` for the project language, entities, and relationships.
+- `docs/adr/` for formal architecture decisions.
+- `docs/decisions/` for additional project decisions that have not been promoted to ADRs.
+- `AGENTS.md` for stack, style, performance, and workflow rules.
 
 If any of these files do not exist, proceed silently. The producer skill (`/grill-with-docs`) creates them lazily when terms or decisions get resolved.
 
-## File structure
-
-This is a single-context repo:
+## File Structure
 
 ```text
 /
 ├── CONTEXT.md
-└── docs/adr/
+├── docs/adr/
+└── docs/decisions/
 ```
 
-## Use the glossary's vocabulary
+## Use The Glossary
 
 When output names a domain concept, use the term as defined in `CONTEXT.md`. If a needed concept is missing, note it for `/grill-with-docs`.
 
-## Flag ADR conflicts
+## Preserve Decisions
 
-If output contradicts an existing ADR, surface it explicitly instead of silently overriding it.
+If output contradicts an existing ADR or decision note, surface it explicitly instead of silently overriding it. When a decision changes project language or architecture, update `CONTEXT.md` or add an ADR/decision note in the same change.

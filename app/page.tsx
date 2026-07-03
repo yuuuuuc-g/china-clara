@@ -146,7 +146,11 @@ export default function Home() {
   const setFocusedPlanet = useSolarStore((state) => state.setFocusedPlanet);
   const [webglLost, setWebglLost] = useState(false);
   const [isConsoleOpen, setIsConsoleOpen] = useState(false);
-  const [activeSystem, setActiveSystem] = useState<ActiveSystem>(null);
+  const [activeSystem, setActiveSystem] = useState<ActiveSystem>(() => {
+    if (typeof window === "undefined") return null;
+    const system = new URLSearchParams(window.location.search).get("system");
+    return system === "archive" ? "archive" : null;
+  });
   const orbitTarget = useMemo<[number, number, number]>(() => [0, 0, 0], []);
   const deviceMemoryGb =
     typeof navigator !== "undefined" && "deviceMemory" in navigator
@@ -239,6 +243,9 @@ export default function Home() {
         return;
       }
       setFocusedPlanet(selectedPlanet);
+      if (selectedPlanet.name !== "Saturn") {
+        setActiveSystem(null);
+      }
       setIsConsoleOpen(false);
     },
     [setFocusedPlanet]

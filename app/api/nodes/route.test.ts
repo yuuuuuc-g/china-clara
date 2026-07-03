@@ -4,7 +4,6 @@ const mocks = vi.hoisted(() => ({
   createClient: vi.fn(),
   from: vi.fn(),
   select: vi.fn(),
-  eq: vi.fn(),
   order: vi.fn(),
 }));
 
@@ -38,8 +37,8 @@ describe("GET /api/nodes", () => {
   it("fetches lightweight node metadata for the target book in chunk order", async () => {
     mocks.order.mockResolvedValue({
       data: [
-        { id: "chunk-1", chapter_title: "规则", chunk_index: 0, book_id: "book-1" },
-        { id: "chunk-2", chapter_title: "产权", chunk_index: 1, book_id: "book-1" },
+        { id: "chunk-1", chapter_title: "规则", chunk_index: 0, book_id: "book-a" },
+        { id: "chunk-2", chapter_title: "产权", chunk_index: 1, book_id: "book-b" },
       ],
       error: null,
     });
@@ -48,8 +47,8 @@ describe("GET /api/nodes", () => {
 
     await expect(response.json()).resolves.toEqual({
       nodes: [
-        { id: "chunk-1", chapter_title: "规则", chunk_index: 0, book_id: "book-1" },
-        { id: "chunk-2", chapter_title: "产权", chunk_index: 1, book_id: "book-1" },
+        { id: "chunk-1", chapter_title: "规则", chunk_index: 0, book_id: "book-a" },
+        { id: "chunk-2", chapter_title: "产权", chunk_index: 1, book_id: "book-b" },
       ],
     });
     expect(response.status).toBe(200);
@@ -59,7 +58,6 @@ describe("GET /api/nodes", () => {
     );
     expect(mocks.from).toHaveBeenCalledWith("rag_chunks");
     expect(mocks.select).toHaveBeenCalledWith("id, chapter_title, chunk_index, book_id");
-    expect(mocks.eq).not.toHaveBeenCalled();
     expect(mocks.order).toHaveBeenCalledWith("chunk_index", { ascending: true });
   });
 

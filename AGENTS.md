@@ -36,6 +36,20 @@
 - **Frame Looping**: Use `useFrame` sparingly. Dispose of geometries/materials on unmount.
 - **State Cleanup**: Always clear `useCompletion` text states (`setCompletion("")`) when transitioning between Refinery phases to prevent memory leaks and UI ghosting.
 
+## Agent skills
+
+### Issue tracker
+
+Issues are tracked in GitHub Issues for `yuuuuuc-g/knowledge-galaxy`. See `docs/agents/issue-tracker.md`.
+
+### Triage labels
+
+Use the default five-state triage label vocabulary. See `docs/agents/triage-labels.md`.
+
+### Domain docs
+
+This is a single-context repo with `CONTEXT.md`, `docs/adr/`, and `docs/decisions/`. See `docs/agents/domain.md`.
+
 ## 🤖 Agent Workflow (Orchestration & Engineering Skills)
 You MUST read and adhere to the skills installed in the `.agents` directory before executing code changes. This project strictly follows the **Matt Pocock "Real Engineering" SOP**:
 
@@ -58,17 +72,3 @@ You MUST read and adhere to the skills installed in the `.agents` directory befo
 
 5. **Communication**
    - Use **`/caveman`**: To reduce token usage and drop filler, communicate with the user in ultra-compressed mode while retaining full technical accuracy.
-
-## Agent skills
-
-### Issue tracker
-
-Issues and PRDs are tracked in GitHub Issues. See `docs/agents/issue-tracker.md`.
-
-### Triage labels
-
-Triage uses the default five-label vocabulary. See `docs/agents/triage-labels.md`.
-
-### Domain docs
-
-This is a single-context repo with one root `CONTEXT.md` and root ADRs. See `docs/agents/domain.md`.
