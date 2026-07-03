@@ -12,6 +12,11 @@ import remarkGfm from "remark-gfm";
 import { CyberButton } from "@/src/components/ui/CyberButton";
 import { GlassPanel } from "@/src/components/ui/GlassPanel";
 import { parseDomainSseFrame } from "@/src/lib/ai-domain-events";
+import { createClient } from "@/src/lib/supabase/client";
+import {
+  createSupabaseArchivePersistence,
+  type ArchiveTopic,
+} from "@/src/lib/archive-persistence";
 
 type RefineryPhase = "A" | "B" | "C" | "D";
 type WorkbenchView = "cards" | "tags" | "editor";
@@ -20,14 +25,6 @@ type PhaseSelections = Record<RefineryPhase, string[]>;
 
 /** Full [选项开始]…[选项结束] inner text per option key, e.g. "A:0" -> "标题：…\n…" */
 type SelectedItemsByPhase = Record<"A" | "B" | "C", Record<string, string>>;
-
-interface Topic {
-  id: string;
-  title: string;
-  description: string | null;
-  created_at?: string;
-  updated_at?: string;
-}
 
 const phaseOrder: RefineryPhase[] = ["A", "B", "C", "D"];
 
@@ -336,7 +333,7 @@ export default function RefineryPage() {
   const [customTags, setCustomTags] = useState<string[]>([]);
   const [tagInput, setTagInput] = useState("");
 
-  const [topics, setTopics] = useState<Topic[]>([]);
+  const [topics, setTopics] = useState<ArchiveTopic[]>([]);
   const [selectedTopicId, setSelectedTopicId] = useState<string | null>(null);
   const [topicsLoading, setTopicsLoading] = useState(true);
 
@@ -351,13 +348,9 @@ export default function RefineryPage() {
     async function fetchTopics() {
       console.log("[Topics] Starting to load topics...");
       try {
-        const response = await fetch("/api/topics", { cache: "no-store" });
-        if (!response.ok) {
-          throw new Error("Unable to load topics.");
-        }
-        const payload = (await response.json()) as { topics?: Topic[] };
+        const archivePersistence = createSupabaseArchivePersistence(createClient());
+        const nextTopics = await archivePersistence.listTopics();
         if (active) {
-          const nextTopics = Array.isArray(payload.topics) ? payload.topics : [];
           console.log("[Topics] Successfully loaded topics:", nextTopics.length, nextTopics);
           setTopics(nextTopics);
         }
@@ -507,43 +500,23 @@ export default function RefineryPage() {
     setSaveStatus("saving");
     setSaveError(null);
 
-    const failPersist = (message: string) => {
-      console.error("[Persist]", message);
-      setSaveStatus("error");
-      setSaveError(message);
-    };
-
     try {
-      const response = await fetch("/api/analytical-pipeline/archive", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          content,
-          sourceText,
-          selectedTopicId,
-          phases: {
-            a: { archive: archives.A, selected_items: selectedItems.A },
-            b: { archive: archives.B, selected_items: selectedItems.B },
-            c: { archive: archives.C, selected_items: selectedItems.C, custom_tags: customTags },
-          },
-        }),
+      const archivePersistence = createSupabaseArchivePersistence(createClient());
+      const result = await archivePersistence.saveAnalyticalDocument({
+        content,
+        sourceIssue: sourceText,
+        archives,
+        selectedItems,
+        customTags,
+        topicId: selectedTopicId,
       });
 
-      if (!response.ok) {
-        const payload = (await response.json().catch(() => null)) as { error?: string } | null;
-        failPersist(payload?.error ?? "Persist request failed.");
-        return;
+      if (result.type === "created") {
+        setTopics((prev) => [result.topic, ...prev]);
+        setSelectedTopicId(result.topic.id);
       }
 
-      const payload = (await response.json()) as { topic?: Topic | null };
-      if (payload.topic) {
-        setTopics((prev) => [payload.topic as Topic, ...prev]);
-        setSelectedTopicId(payload.topic.id);
-      }
-
-      console.log("[Persist] archive write complete.");
+      console.log("[Persist] Save complete.", result);
       setSaveStatus("saved");
       setTimeout(() => setSaveStatus("idle"), 3000);
     } catch (err) {

@@ -5,9 +5,11 @@ import { useRouter } from "next/navigation";
 import { Trash2, X } from "lucide-react";
 import { downloadAllDocumentsAsJson } from "@/src/lib/export-utils";
 import { DialogFrame } from "@/src/components/ui/DialogFrame";
-import type { Database } from "@/src/lib/database.types";
-
-type Document = Database["public"]["Tables"]["documents"]["Row"];
+import { createClient } from "@/src/lib/supabase/client";
+import {
+  createSupabaseArchivePersistence,
+  type ArchiveDocument,
+} from "@/src/lib/archive-persistence";
 
 interface ArchivePanelProps {
   onClose: () => void;
@@ -15,7 +17,7 @@ interface ArchivePanelProps {
 
 export function ArchivePanel({ onClose }: ArchivePanelProps) {
   const router = useRouter();
-  const [documents, setDocuments] = useState<Document[]>([]);
+  const [documents, setDocuments] = useState<ArchiveDocument[]>([]);
   const [loading, setLoading] = useState(true);
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
@@ -24,13 +26,10 @@ export function ArchivePanel({ onClose }: ArchivePanelProps) {
 
     async function loadDocuments() {
       try {
-        const response = await fetch("/api/archive", { cache: "no-store" });
-        if (!response.ok) {
-          throw new Error("Unable to load archive documents.");
-        }
-        const payload = (await response.json()) as { documents?: Document[] };
+        const archivePersistence = createSupabaseArchivePersistence(createClient());
+        const nextDocuments = await archivePersistence.listDocuments();
         if (active) {
-          setDocuments(Array.isArray(payload.documents) ? payload.documents : []);
+          setDocuments(nextDocuments);
         }
       } catch (error) {
         console.error("[ArchivePanel] load failed:", error);
@@ -60,14 +59,15 @@ export function ArchivePanel({ onClose }: ArchivePanelProps) {
     }
 
     setDeletingId(id);
-    const response = await fetch(`/api/archive/${id}`, { method: "DELETE" });
-    if (response.ok) {
+    try {
+      const archivePersistence = createSupabaseArchivePersistence(createClient());
+      await archivePersistence.deleteDocument(id);
       setDocuments((current) => current.filter((doc) => doc.id !== id));
-    } else {
-      console.error("[ArchivePanel] delete failed:", await response.text());
+    } catch (error) {
+      console.error("[ArchivePanel] delete failed:", error);
+    } finally {
+      setDeletingId(null);
     }
-
-    setDeletingId(null);
   };
 
   return (
