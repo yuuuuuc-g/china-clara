@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useState } from "react";
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import Placeholder from "@tiptap/extension-placeholder";
@@ -11,236 +11,17 @@ import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { CyberButton } from "@/src/components/ui/CyberButton";
 import { GlassPanel } from "@/src/components/ui/GlassPanel";
-import { parseDomainSseFrame } from "@/src/lib/ai-domain-events";
-import { createClient } from "@/src/lib/supabase/client";
 import {
-  createSupabaseArchivePersistence,
-  type ArchiveTopic,
-} from "@/src/lib/archive-persistence";
-
-type RefineryPhase = "A" | "B" | "C" | "D";
-type WorkbenchView = "cards" | "tags" | "editor";
-
-type PhaseSelections = Record<RefineryPhase, string[]>;
-
-/** Full [选项开始]…[选项结束] inner text per option key, e.g. "A:0" -> "标题：…\n…" */
-type SelectedItemsByPhase = Record<"A" | "B" | "C", Record<string, string>>;
-
-const phaseOrder: RefineryPhase[] = ["A", "B", "C", "D"];
-
-const phaseMeta: Record<
-  RefineryPhase,
-  { title: string; kicker: string; action: string }
-> = {
-  A: {
-    title: "Briefing List",
-    kicker: "查 Briefing",
-    action: "GENERATE BRIEFING",
-  },
-  B: {
-    title: "Atomic Events",
-    kicker: "选原子事件",
-    action: "BUILD EVENT CHAIN",
-  },
-  C: {
-    title: "Keywords",
-    kicker: "选关键词",
-    action: "DISTILL KEYWORDS",
-  },
-  D: {
-    title: "Final Draft",
-    kicker: "生成正文",
-    action: "WRITE DRAFT",
-  },
-};
-
-const emptySelections: PhaseSelections = {
-  A: [],
-  B: [],
-  C: [],
-  D: [],
-};
-
-const emptyArchives: Record<"A" | "B" | "C", string> = {
-  A: "",
-  B: "",
-  C: "",
-};
-
-const emptySelectedItems: SelectedItemsByPhase = {
-  A: {},
-  B: {},
-  C: {},
-};
+  normalizeOptionText,
+  optionKey,
+  parseLabeledLines,
+  phaseMeta,
+  phaseOrder,
+} from "@/src/modules/refinery/session";
+import { useAnalyticalSession } from "@/src/modules/refinery/use-analytical-session";
 
 const initialPrompt =
   "输入一个公共事件、政策争议、市场现象或社会议题，启动推演。";
-
-function getNextPhase(phase: RefineryPhase): RefineryPhase | null {
-  const currentIndex = phaseOrder.indexOf(phase);
-  return phaseOrder[currentIndex + 1] ?? null;
-}
-
-function optionKey(phase: Exclude<RefineryPhase, "D">, index: number): string {
-  return `${phase}:${index}`;
-}
-
-function extractOptionBlocks(text: string): string[] {
-  const lines = text.split("\n");
-  const blocks: string[] = [];
-  let currentBlockLines: string[] = [];
-  const listItemRegex = /^(\s*)([-*]|\d+\.)\s+/;
-
-  for (const line of lines) {
-    const isListItem = listItemRegex.test(line);
-
-    if (isListItem) {
-      if (currentBlockLines.length > 0) {
-        const blockContent = currentBlockLines.join("\n").trim();
-        if (blockContent.length > 0) {
-          blocks.push(blockContent);
-        }
-      }
-      const match = line.match(listItemRegex);
-      if (match) {
-        const prefixLength = match[0].length;
-        currentBlockLines = [line.slice(prefixLength)];
-      } else {
-        currentBlockLines = [line];
-      }
-    } else if (currentBlockLines.length > 0) {
-      currentBlockLines.push(line);
-    }
-  }
-
-  if (currentBlockLines.length > 0) {
-    const blockContent = currentBlockLines.join("\n").trim();
-    if (blockContent.length > 0) {
-      blocks.push(blockContent);
-    }
-  }
-
-  return blocks;
-}
-
-function sanitizeStreamingOutput(text: string): string {
-  if (!text) {
-    return "";
-  }
-
-  const withoutXmlToolCalls = text
-    .replace(/<tool_call>[\s\S]*?<\/tool_call>/g, "")
-    .replace(/<tool_result>[\s\S]*?<\/tool_result>/g, "");
-
-  const filteredLines = withoutXmlToolCalls
-    .split("\n")
-    .filter((line) => {
-      const trimmed = line.trim();
-      if (!trimmed) {
-        return true;
-      }
-      return !(
-        trimmed.includes('"toolName"') ||
-        trimmed.includes('"toolCallId"') ||
-        trimmed.includes('"type":"tool-call"') ||
-        trimmed.includes('"type": "tool-call"') ||
-        trimmed.includes('"type":"tool-result"') ||
-        trimmed.includes('"type": "tool-result"')
-      );
-    });
-
-  return filteredLines.join("\n").trim();
-}
-
-function parseLabeledLines(block: string): { label: string; value: string }[] {
-  return block.split(/\n/).flatMap((line) => {
-    const trimmed = line.trim();
-    if (!trimmed) {
-      return [];
-    }
-    const sep = "：";
-    const idx = trimmed.indexOf(sep);
-    if (idx === -1) {
-      return [{ label: "", value: trimmed }];
-    }
-    return [
-      {
-        label: trimmed.slice(0, idx).trim(),
-        value: trimmed.slice(idx + sep.length).trim(),
-      },
-    ];
-  });
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
-}
-
-function normalizeOptionText(value: unknown): string {
-  if (typeof value === "string") {
-    return value;
-  }
-
-  if (!isRecord(value)) {
-    return "";
-  }
-
-  const title = typeof value.title === "string" ? value.title.trim() : "";
-  const summary = typeof value.summary === "string" ? value.summary.trim() : "";
-
-  return [
-    title ? `标题：${title}` : "",
-    summary ? `摘要：${summary}` : "",
-  ]
-    .filter(Boolean)
-    .join("\n");
-}
-
-/** Join stored option bodies in stable key order (A:0, A:1, …). */
-function joinSelectedItems(items: Record<string, unknown>): string {
-  return Object.entries(items)
-    .sort(([ka], [kb]) => {
-      const ia = Number.parseInt(ka.split(":")[1] ?? "0", 10);
-      const ib = Number.parseInt(kb.split(":")[1] ?? "0", 10);
-      return ia - ib;
-    })
-    .map(([, text]) => normalizeOptionText(text))
-    .filter(Boolean)
-    .join("\n\n---\n\n");
-}
-
-function buildPhasePrompt({
-  phase,
-  sourceText,
-  archives,
-  selectedItems,
-  customTags,
-}: {
-  phase: RefineryPhase;
-  sourceText: string;
-  archives: Record<"A" | "B" | "C", string>;
-  selectedItems: SelectedItemsByPhase;
-  customTags: string[];
-}) {
-  const selectedBriefings = joinSelectedItems(selectedItems.A);
-  const selectedEvents = joinSelectedItems(selectedItems.B);
-  const selectedKeywords = joinSelectedItems(selectedItems.C);
-  const allKeywords = [selectedKeywords, ...customTags].filter(Boolean).join("\n");
-
-  if (phase === "A") {
-    return `原始议题：\n${sourceText}`;
-  }
-
-  if (phase === "B") {
-    return `原始议题：\n${sourceText}\n\nPhase A 完整输出：\n${archives.A}\n\n用户选中的 Briefing（选项原文）：\n${selectedBriefings}`;
-  }
-
-  if (phase === "C") {
-    return `原始议题：\n${sourceText}\n\n用户选中的 Briefing（选项原文）：\n${selectedBriefings}\n\nPhase B 完整输出：\n${archives.B}\n\n用户选中的原子事件（选项原文）：\n${selectedEvents}`;
-  }
-
-  return `原始议题：\n${sourceText}\n\n用户选中的 Briefing（选项原文）：\n${selectedBriefings}\n\n用户选中的原子事件（选项原文）：\n${selectedEvents}\n\nPhase C 完整输出：\n${archives.C}\n\n用户选中的关键词（选项原文）：\n${allKeywords}`;
-}
 
 interface RefineryTipTapDraftProps {
   initialContent: string;
@@ -315,357 +96,45 @@ function RefineryMarkdownPreview({ text }: RefineryMarkdownPreviewProps) {
 
 export default function RefineryPage() {
   const router = useRouter();
-  const [sourceText, setSourceText] = useState("");
-  const [phase, setPhase] = useState<RefineryPhase>("A");
-  const [archives, setArchives] = useState(emptyArchives);
-  const [draftD, setDraftD] = useState("");
-  const [selections, setSelections] = useState<PhaseSelections>(emptySelections);
-  const [selectedItems, setSelectedItems] =
-    useState<SelectedItemsByPhase>(emptySelectedItems);
-  const [pendingPhase, setPendingPhase] = useState<RefineryPhase | null>(null);
-  const [completion, setCompletion] = useState("");
-  const [isLoading, setIsLoading] = useState(false);
-  const [completionError, setCompletionError] = useState<Error | null>(null);
-
-  const [isEditing, setIsEditing] = useState(false);
-  const [editInitialContent, setEditInitialContent] = useState("");
-  const [saveStatus, setSaveStatus] = useState<"idle" | "saving" | "saved" | "error">("idle");
-  const [customTags, setCustomTags] = useState<string[]>([]);
+  const {
+    state,
+    view,
+    topics,
+    topicsLoading,
+    isLoading,
+    completionError,
+    saveStatus,
+    commands,
+  } = useAnalyticalSession();
   const [tagInput, setTagInput] = useState("");
 
-  const [topics, setTopics] = useState<ArchiveTopic[]>([]);
-  const [selectedTopicId, setSelectedTopicId] = useState<string | null>(null);
-  const [topicsLoading, setTopicsLoading] = useState(true);
-
-  const handleEnterEdit = useCallback(() => {
-    setEditInitialContent(draftD || completion);
-    setIsEditing(true);
-  }, [draftD, completion]);
-
-  useEffect(() => {
-    let active = true;
-
-    async function fetchTopics() {
-      console.log("[Topics] Starting to load topics...");
-      try {
-        const archivePersistence = createSupabaseArchivePersistence(createClient());
-        const nextTopics = await archivePersistence.listTopics();
-        if (active) {
-          console.log("[Topics] Successfully loaded topics:", nextTopics.length, nextTopics);
-          setTopics(nextTopics);
-        }
-      } catch (error) {
-        console.error("[Topics] Unexpected error while loading topics:", error);
-      } finally {
-        if (active) {
-          setTopicsLoading(false);
-        }
-      }
-    }
-
-    fetchTopics();
-    return () => {
-      active = false;
-    };
-  }, []);
-
-  const phaseHasVisibleWorkbenchOutput =
-    phase !== "D" &&
-    ((pendingPhase === phase && isLoading) || archives[phase].length > 0);
-
-  const isWorkbenchOpen = phase !== "A" || phaseHasVisibleWorkbenchOutput;
-  const workbenchView: WorkbenchView =
-    phase === "D" ? "editor" : phase === "C" ? "tags" : "cards";
-
-  const handleSaveDraft = useCallback((html: string) => {
-    setDraftD(html);
-    setIsEditing(false);
-  }, []);
-
-  const handleCancelEdit = useCallback(() => {
-    setIsEditing(false);
-  }, []);
-
-  const completePrompt = useCallback(
-    async (prompt: string, requestBody: Record<string, unknown>): Promise<string> => {
-      setIsLoading(true);
-      setCompletionError(null);
-
-      let accumulatedText = "";
-
-      try {
-        const response = await fetch("/api/analytical-pipeline", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            prompt,
-            ...requestBody,
-          }),
-        });
-
-        if (!response.ok) {
-          const payload = (await response.json().catch(() => null)) as { error?: string } | null;
-          throw new Error(payload?.error ?? "Analytical pipeline request failed.");
-        }
-
-        if (!response.body) {
-          throw new Error("Analytical pipeline stream is empty.");
-        }
-
-        const reader = response.body.getReader();
-        const decoder = new TextDecoder();
-        let buffer = "";
-
-        const applyFrame = (frame: string) => {
-          const parsedFrame = parseDomainSseFrame(frame);
-          if (!parsedFrame) {
-            return;
-          }
-
-          const event = parsedFrame.event;
-          if (event.type === "generation.delta") {
-            accumulatedText += event.text;
-            setCompletion(accumulatedText);
-            return;
-          }
-
-          if (event.type === "generation.finished") {
-            if (typeof event.text === "string") {
-              accumulatedText = event.text;
-              setCompletion(event.text);
-            }
-            return;
-          }
-
-          if (event.type === "generation.failed") {
-            throw new Error(event.message);
-          }
-        };
-
-        while (true) {
-          const { done, value } = await reader.read();
-
-          if (value) {
-            buffer += decoder.decode(value, { stream: true });
-            const frames = buffer.split("\n\n");
-            buffer = frames.pop() ?? "";
-
-            frames.forEach(applyFrame);
-          }
-
-          if (done) {
-            break;
-          }
-        }
-
-        const remainingText = decoder.decode();
-        if (remainingText.length > 0) {
-          buffer += remainingText;
-        }
-
-        if (buffer.trim().length > 0) {
-          applyFrame(buffer);
-        }
-
-        console.info("[Mars Crucible] completion finished", {
-          chars: accumulatedText.length,
-        });
-
-        return accumulatedText;
-      } catch (error) {
-        const safeError =
-          error instanceof Error
-            ? error
-            : new Error("Analytical pipeline request failed.");
-        setCompletionError(safeError);
-        console.error("[Mars Crucible] completion error", safeError);
-        throw safeError;
-      } finally {
-        setIsLoading(false);
-      }
-    },
-    [],
-  );
-
-  const [, setSaveError] = useState<string | null>(null);
-
-  const handlePersistToDatabase = useCallback(async () => {
-    const content = (draftD || completion).trim();
-    if (!content) {
-      console.warn("[Persist] Content is empty, aborting save.");
-      return;
-    }
-
-    console.log("[Persist] Starting save. selectedTopicId:", selectedTopicId);
-    setSaveStatus("saving");
-    setSaveError(null);
-
-    try {
-      const archivePersistence = createSupabaseArchivePersistence(createClient());
-      const result = await archivePersistence.saveAnalyticalDocument({
-        content,
-        sourceIssue: sourceText,
-        archives,
-        selectedItems,
-        customTags,
-        topicId: selectedTopicId,
-      });
-
-      if (result.type === "created") {
-        setTopics((prev) => [result.topic, ...prev]);
-        setSelectedTopicId(result.topic.id);
-      }
-
-      console.log("[Persist] Save complete.", result);
-      setSaveStatus("saved");
-      setTimeout(() => setSaveStatus("idle"), 3000);
-    } catch (err) {
-      console.error("[Persist] Unexpected error:", err);
-      setSaveStatus("error");
-      setSaveError(err instanceof Error ? err.message : "Unknown error occurred");
-    }
-  }, [draftD, completion, sourceText, archives, selectedItems, customTags, selectedTopicId]);
-
-  const leftArchiveText =
-    phase === "D"
-      ? ""
-      : pendingPhase === phase && isLoading
-        ? sanitizeStreamingOutput(completion)
-        : archives[phase];
-
-  const optionBlocks = useMemo(
-    () => (phase === "D" ? [] : extractOptionBlocks(leftArchiveText)),
-    [phase, leftArchiveText],
-  );
-
-  const selectedKeys = selections[phase];
-
-  /** Keys + full block text for the phase we are about to *run* (prior phase picks). */
-  const priorSelectedKeysForRun =
-    phase === "B"
-      ? selections.A
-      : phase === "C"
-        ? selections.B
-        : phase === "D"
-          ? selections.C
-          : [];
-
-  const nextPhase = getNextPhase(phase);
-  const canRequest =
-    phase === "A"
-      ? sourceText.trim().length > 0
-      : phase === "D"
-        ? (priorSelectedKeysForRun.length > 0 || customTags.length > 0) && archives.C.length > 0
-        : priorSelectedKeysForRun.length > 0 &&
-          (phase === "B"
-            ? archives.A.length > 0
-            : phase === "C"
-              ? archives.B.length > 0
-              : false);
-
-  const toggleSelection = useCallback(
-    (key: string, blockFullText: string) => {
-      if (phase === "D") {
-        return;
-      }
-      const p = phase;
-      setSelections((currentSelections) => {
-        const phaseSelections = currentSelections[p];
-        const adding = !phaseSelections.includes(key);
-        const nextSelections = adding
-          ? [...phaseSelections, key]
-          : phaseSelections.filter((item) => item !== key);
-
-        setSelectedItems((currentItems) => {
-          const nextMap = { ...currentItems[p] };
-          if (adding) {
-            nextMap[key] = blockFullText;
-          } else {
-            delete nextMap[key];
-          }
-          return { ...currentItems, [p]: nextMap };
-        });
-
-        return {
-          ...currentSelections,
-          [p]: nextSelections,
-        };
-      });
-    },
-    [phase],
-  );
-
-  const runPhase = async (targetPhase: RefineryPhase) => {
-    if (isLoading || !canRequest) {
-      return;
-    }
-
-    const prompt = buildPhasePrompt({
-      phase: targetPhase,
-      sourceText: sourceText.trim(),
-      archives,
-      selectedItems,
-      customTags,
-    });
-
-    setPendingPhase(targetPhase);
-    setCompletion("");
-
-    const requestBody: Record<string, unknown> = {
-      phase: targetPhase,
-    };
-
-    if (targetPhase === "D" && selectedTopicId) {
-      const existingTopic = topics.find((t) => t.id === selectedTopicId);
-      if (existingTopic) {
-        requestBody.selectedTopicId = selectedTopicId;
-        requestBody.topicTitle = existingTopic.title;
-      }
-    }
-
-    try {
-      const result = await completePrompt(prompt, requestBody);
-      const finalText = sanitizeStreamingOutput(result ?? "");
-
-      if (targetPhase === "D") {
-        setDraftD(finalText);
-      } else {
-        setArchives((current) => ({
-          ...current,
-          [targetPhase]: finalText,
-        }));
-      }
-    } catch (error) {
-      console.error("[Mars Crucible] runPhase failed", {
-        targetPhase,
-        error,
-      });
-    } finally {
-      setPendingPhase(null);
-    }
-  };
-
-  const advancePhase = () => {
-    if (!nextPhase) {
-      return;
-    }
-    setPhase(nextPhase);
-    setIsEditing(false);
-    setCompletion("");
-  };
+  const {
+    sourceText,
+    phase,
+    draftD,
+    selections,
+    selectedItems,
+    completion,
+    customTags,
+    selectedTopicId,
+    isEditing,
+    editInitialContent,
+  } = state;
+  const {
+    isWorkbenchOpen,
+    workbenchView,
+    optionBlocks,
+    selectedKeys,
+    priorSelectedKeysForRun,
+    nextPhase,
+    canRequest,
+    showAdvance,
+    streamingD,
+  } = view;
 
   const resetFlow = () => {
-    setPhase("A");
-    setArchives(emptyArchives);
-    setDraftD("");
-    setSelections(emptySelections);
-    setSelectedItems(emptySelectedItems);
-    setPendingPhase(null);
-    setCompletion("");
-    setIsEditing(false);
-    setCustomTags([]);
+    commands.resetFlow();
     setTagInput("");
-    setSelectedTopicId(null);
   };
 
   const handleBackToMars = () => {
@@ -684,14 +153,6 @@ export default function RefineryPage() {
 
     router.push("/#mars");
   };
-
-  const showAdvance =
-    nextPhase !== null &&
-    phase !== "D" &&
-    !isLoading &&
-    optionBlocks.length > 0;
-
-  const streamingD = phase === "D" && pendingPhase === "D" && isLoading;
 
   return (
     <main className="min-h-screen overflow-y-auto bg-zinc-950 text-white">
@@ -742,13 +203,7 @@ export default function RefineryPage() {
                       <motion.button
                         key={p}
                         type="button"
-                        onClick={() => {
-                          setPhase(p);
-                          setIsEditing(false);
-                          if (p !== "D") {
-                            setCompletion("");
-                          }
-                        }}
+                        onClick={() => commands.switchPhase(p)}
                         initial={{ opacity: 0, x: -36, y: isEven ? -8 : 8 }}
                         animate={{ opacity: 1, x: 0, y: 0 }}
                         transition={{ delay: index * 0.12, duration: 0.28, ease: "easeOut" }}
@@ -791,7 +246,7 @@ export default function RefineryPage() {
                         value={selectedTopicId ?? "CREATE_NEW_TOPIC"}
                         onChange={(e) => {
                           const value = e.target.value;
-                          setSelectedTopicId(value === "CREATE_NEW_TOPIC" ? null : value);
+                          commands.selectTopic(value === "CREATE_NEW_TOPIC" ? null : value);
                         }}
                         disabled={topicsLoading}
                         className="flex-1 bg-transparent text-sm text-white outline-none"
@@ -808,7 +263,7 @@ export default function RefineryPage() {
                     </div>
                     <textarea
                       value={sourceText}
-                      onChange={(event) => setSourceText(event.target.value)}
+                      onChange={(event) => commands.setSourceText(event.target.value)}
                       placeholder={initialPrompt}
                       className="min-h-32 w-full resize-none rounded border border-white/10 bg-white/[0.04] px-4 py-3 text-sm leading-6 text-white outline-none transition placeholder:text-white/30 focus:border-[#deff9a]/50 focus:bg-white/[0.06]"
                     />
@@ -872,7 +327,7 @@ export default function RefineryPage() {
                 <CyberButton
                   className="min-h-12 flex-1"
                   disabled={!canRequest || isLoading}
-                  onClick={() => void runPhase(phase)}
+                  onClick={() => void commands.runPhase(phase)}
                 >
                   <Sparkles size={16} aria-hidden="true" />
                   {isLoading ? "REFINING..." : phaseMeta[phase].action}
@@ -884,7 +339,7 @@ export default function RefineryPage() {
                     disabled={
                       (phase === "C" ? selections.C.length === 0 && customTags.length === 0 : selectedKeys.length === 0) || isLoading
                     }
-                    onClick={advancePhase}
+                    onClick={commands.advancePhase}
                   >
                     <CheckCircle2 size={16} aria-hidden="true" />
                     ENTER PHASE {nextPhase}
@@ -968,7 +423,7 @@ export default function RefineryPage() {
                           <>
                             <button
                               type="button"
-                              onClick={handlePersistToDatabase}
+                              onClick={commands.persistToDatabase}
                               disabled={saveStatus === "saving"}
                               className={`flex items-center gap-2 rounded border px-3 py-2 text-xs transition ${
                                 saveStatus === "error"
@@ -984,7 +439,7 @@ export default function RefineryPage() {
                             </button>
                             <button
                               type="button"
-                              onClick={handleEnterEdit}
+                              onClick={commands.enterEditMode}
                               className="flex items-center gap-2 rounded border border-white/10 bg-white/[0.04] px-3 py-2 text-xs text-white/60 transition hover:border-[#deff9a]/40 hover:text-[#deff9a]"
                               title="进入编辑模式"
                             >
@@ -1019,7 +474,7 @@ export default function RefineryPage() {
                             <input
                               type="checkbox"
                               checked={checked}
-                              onChange={() => toggleSelection(key, optionText)}
+                              onChange={() => commands.toggleSelection(key, optionText)}
                               className="mt-1 size-4 shrink-0 rounded border border-white/30 bg-zinc-900 text-[#deff9a] accent-[#deff9a]"
                             />
                             <div className="min-w-0 flex-1 space-y-2">
@@ -1070,7 +525,7 @@ export default function RefineryPage() {
                               <input
                                 type="checkbox"
                                 checked={checked}
-                                onChange={() => toggleSelection(key, optionText)}
+                                onChange={() => commands.toggleSelection(key, optionText)}
                                 className="hidden"
                               />
                               <div className="space-y-1">
@@ -1100,7 +555,7 @@ export default function RefineryPage() {
                               {tag}
                               <button
                                 type="button"
-                                onClick={() => setCustomTags((prev) => prev.filter((t) => t !== tag))}
+                                onClick={() => commands.removeCustomTag(tag)}
                                 className="ml-0.5 rounded-full p-0.5 text-[#deff9a]/60 transition hover:bg-[#deff9a]/15 hover:text-[#deff9a]"
                               >
                                 <X size={12} />
@@ -1117,9 +572,7 @@ export default function RefineryPage() {
                               if (e.key === "Enter" && tagInput.trim()) {
                                 e.preventDefault();
                                 const newTag = tagInput.trim();
-                                if (!customTags.includes(newTag) && !Object.values(selectedItems.C).includes(newTag)) {
-                                  setCustomTags((prev) => [...prev, newTag]);
-                                }
+                                commands.addCustomTag(newTag);
                                 setTagInput("");
                               }
                             }}
@@ -1131,9 +584,7 @@ export default function RefineryPage() {
                             onClick={() => {
                               if (tagInput.trim()) {
                                 const newTag = tagInput.trim();
-                                if (!customTags.includes(newTag) && !Object.values(selectedItems.C).includes(newTag)) {
-                                  setCustomTags((prev) => [...prev, newTag]);
-                                }
+                                commands.addCustomTag(newTag);
                                 setTagInput("");
                               }
                             }}
@@ -1152,8 +603,8 @@ export default function RefineryPage() {
                     isEditing ? (
                       <RefineryTipTapDraft
                         initialContent={editInitialContent}
-                        onSave={handleSaveDraft}
-                        onCancel={handleCancelEdit}
+                        onSave={commands.saveDraft}
+                        onCancel={commands.cancelEdit}
                       />
                     ) : (
                       <RefineryMarkdownPreview text={streamingD ? completion : draftD} />
