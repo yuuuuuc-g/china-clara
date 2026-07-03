@@ -2,7 +2,6 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { useCompletion } from "@ai-sdk/react";
 import { motion } from "framer-motion";
 import Placeholder from "@tiptap/extension-placeholder";
 import { EditorContent, useEditor } from "@tiptap/react";
@@ -12,6 +11,7 @@ import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { CyberButton } from "@/src/components/ui/CyberButton";
 import { GlassPanel } from "@/src/components/ui/GlassPanel";
+import { parseDomainSseFrame } from "@/src/lib/ai-domain-events";
 
 type RefineryPhase = "A" | "B" | "C" | "D";
 type WorkbenchView = "cards" | "tags" | "editor";
@@ -326,24 +326,9 @@ export default function RefineryPage() {
   const [selectedItems, setSelectedItems] =
     useState<SelectedItemsByPhase>(emptySelectedItems);
   const [pendingPhase, setPendingPhase] = useState<RefineryPhase | null>(null);
-  const {
-    complete,
-    completion,
-    isLoading,
-    error: completionError,
-    setCompletion,
-  } = useCompletion({
-    api: "/api/analytical-pipeline",
-    streamProtocol: "text",
-    onFinish: (_prompt, completionText) => {
-      console.info("[Mars Crucible] completion finished", {
-        chars: completionText.length,
-      });
-    },
-    onError: (error) => {
-      console.error("[Mars Crucible] completion error", error);
-    },
-  });
+  const [completion, setCompletion] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
+  const [completionError, setCompletionError] = useState<Error | null>(null);
 
   const [isEditing, setIsEditing] = useState(false);
   const [editInitialContent, setEditInitialContent] = useState("");
@@ -407,6 +392,107 @@ export default function RefineryPage() {
   const handleCancelEdit = useCallback(() => {
     setIsEditing(false);
   }, []);
+
+  const completePrompt = useCallback(
+    async (prompt: string, requestBody: Record<string, unknown>): Promise<string> => {
+      setIsLoading(true);
+      setCompletionError(null);
+
+      let accumulatedText = "";
+
+      try {
+        const response = await fetch("/api/analytical-pipeline", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            prompt,
+            ...requestBody,
+          }),
+        });
+
+        if (!response.ok) {
+          const payload = (await response.json().catch(() => null)) as { error?: string } | null;
+          throw new Error(payload?.error ?? "Analytical pipeline request failed.");
+        }
+
+        if (!response.body) {
+          throw new Error("Analytical pipeline stream is empty.");
+        }
+
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = "";
+
+        const applyFrame = (frame: string) => {
+          const parsedFrame = parseDomainSseFrame(frame);
+          if (!parsedFrame) {
+            return;
+          }
+
+          const event = parsedFrame.event;
+          if (event.type === "generation.delta") {
+            accumulatedText += event.text;
+            setCompletion(accumulatedText);
+            return;
+          }
+
+          if (event.type === "generation.finished") {
+            if (typeof event.text === "string") {
+              accumulatedText = event.text;
+              setCompletion(event.text);
+            }
+            return;
+          }
+
+          if (event.type === "generation.failed") {
+            throw new Error(event.message);
+          }
+        };
+
+        while (true) {
+          const { done, value } = await reader.read();
+
+          if (value) {
+            buffer += decoder.decode(value, { stream: true });
+            const frames = buffer.split("\n\n");
+            buffer = frames.pop() ?? "";
+
+            frames.forEach(applyFrame);
+          }
+
+          if (done) {
+            break;
+          }
+        }
+
+        const remainingText = decoder.decode();
+        if (remainingText.length > 0) {
+          buffer += remainingText;
+        }
+
+        if (buffer.trim().length > 0) {
+          applyFrame(buffer);
+        }
+
+        console.info("[Mars Crucible] completion finished", {
+          chars: accumulatedText.length,
+        });
+
+        return accumulatedText;
+      } catch (error) {
+        const safeError =
+          error instanceof Error
+            ? error
+            : new Error("Analytical pipeline request failed.");
+        setCompletionError(safeError);
+        console.error("[Mars Crucible] completion error", safeError);
+        throw safeError;
+      } finally {
+        setIsLoading(false);
+      }
+    },
+    [],
+  );
 
   const [, setSaveError] = useState<string | null>(null);
 
@@ -565,9 +651,7 @@ export default function RefineryPage() {
     }
 
     try {
-      const result = await complete(prompt, {
-        body: requestBody,
-      });
+      const result = await completePrompt(prompt, requestBody);
       const finalText = sanitizeStreamingOutput(result ?? "");
 
       if (targetPhase === "D") {

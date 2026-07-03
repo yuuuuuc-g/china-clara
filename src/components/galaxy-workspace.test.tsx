@@ -176,23 +176,27 @@ describe("GalaxyWorkspace", () => {
           new Response(
             sseStream([
               {
-                event: "agent_started",
-                data: { query: "规则如何促进合作？", rewrittenQuery: "规则 制度 Institutions 产权" },
+                event: "retrieval.started",
+                data: {
+                  type: "retrieval.started",
+                  query: "规则如何促进合作？",
+                  rewrittenQuery: "规则 制度 Institutions 产权",
+                },
               },
               {
-                event: "tool_call_started",
+                event: "retrieval.query",
                 data: {
+                  type: "retrieval.query",
                   iteration: 1,
-                  toolCallId: "call_1",
-                  toolName: "hybrid_search",
                   query: "制度经济学",
                 },
               },
               {
-                event: "tool_call_result",
+                event: "retrieval.result",
                 data: {
+                  type: "retrieval.result",
                   iteration: 1,
-                  toolCallId: "call_1",
+                  retrievedChunks: 4,
                   results: [
                     {
                       id: "chunk-2",
@@ -230,20 +234,20 @@ describe("GalaxyWorkspace", () => {
                 },
               },
               {
-                event: "iteration_summary",
-                data: { iteration: 1, continueReason: "model_requested_tool" },
+                event: "generation.step",
+                data: { type: "generation.step", iteration: 1, label: "model_requested_tool" },
               },
               {
-                event: "model_delta",
-                data: { iteration: 2, delta: "制度" },
+                event: "generation.delta",
+                data: { type: "generation.delta", iteration: 2, text: "制度" },
               },
               {
-                event: "model_delta",
-                data: { iteration: 2, delta: "降低交易成本" },
+                event: "generation.delta",
+                data: { type: "generation.delta", iteration: 2, text: "降低交易成本" },
               },
               {
-                event: "agent_finished",
-                data: { totalIterations: 2 },
+                event: "generation.finished",
+                data: { type: "generation.finished", totalIterations: 2 },
               },
             ]),
             {

@@ -6,6 +6,10 @@ import {
   isRefineryPhase,
   runRefineryPhase,
 } from "@/src/modules/refinery/phase";
+import {
+  createDomainEventStream,
+  domainEventStreamHeaders,
+} from "@/src/lib/ai-domain-events";
 
 interface RefineryRequestBody {
   prompt?: unknown;
@@ -104,5 +108,47 @@ export async function POST(request: Request) {
     ragRepository,
   });
 
-  return result.toTextStreamResponse();
+  const textResponse = result.toTextStreamResponse();
+  if (!textResponse.body) {
+    return Response.json({ error: "Model stream is empty." }, { status: 502 });
+  }
+
+  const stream = createDomainEventStream(async (sendEvent) => {
+    const reader = textResponse.body?.getReader();
+    if (!reader) {
+      throw new Error("Model stream is empty.");
+    }
+
+    const decoder = new TextDecoder();
+    let finalText = "";
+
+    while (true) {
+      const { done, value } = await reader.read();
+
+      if (value) {
+        const text = decoder.decode(value, { stream: true });
+        if (text.length > 0) {
+          finalText += text;
+          sendEvent({ type: "generation.delta", text });
+        }
+      }
+
+      if (done) {
+        break;
+      }
+    }
+
+    const remainingText = decoder.decode();
+    if (remainingText.length > 0) {
+      finalText += remainingText;
+      sendEvent({ type: "generation.delta", text: remainingText });
+    }
+
+    sendEvent({ type: "generation.finished", text: finalText });
+  });
+
+  return new Response(stream, {
+    headers: domainEventStreamHeaders(),
+    status: 200,
+  });
 }

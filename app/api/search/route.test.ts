@@ -197,20 +197,20 @@ describe("POST /api/search", () => {
     expect(response.status).toBe(200);
     expect(response.headers.get("Content-Type")).toContain("text/event-stream");
     expect(events.map((event) => event.event)).toEqual([
-      "agent_started",
-      "tool_call_started",
-      "tool_call_result",
-      "iteration_summary",
-      "model_delta",
-      "iteration_summary",
-      "agent_finished",
+      "retrieval.started",
+      "retrieval.query",
+      "retrieval.result",
+      "generation.step",
+      "generation.delta",
+      "generation.step",
+      "generation.finished",
     ]);
     expect(events[2]?.data.results).toMatchObject([
       { id: "chunk-1", chapter_title: "制度与合作", preview: "规则降低交易成本。" },
       { id: "chunk-2", chapter_title: "分工", preview: "专业化依赖可预期规则。" },
     ]);
     expect(JSON.stringify(events[2]?.data.results)).not.toContain("content");
-    expect(events[4]?.data.delta).toBe("制度通过降低不确定性促进合作。");
+    expect(events[4]?.data.text).toBe("制度通过降低不确定性促进合作。");
     expect(mocks.rpc).toHaveBeenCalledWith("hybrid_search", {
       query_text: "制度经济学",
       query_embedding: "[0.1,0.2,0.3]",
@@ -254,7 +254,7 @@ describe("POST /api/search", () => {
     const events = parseSseEvents(await response.text());
     const lastEvent = events[events.length - 1];
 
-    expect(lastEvent?.event).toBe("agent_failed");
+    expect(lastEvent?.event).toBe("generation.failed");
     expect(lastEvent?.data.reason).toBe("max_iterations_exceeded");
     expect(mocks.rpc).toHaveBeenCalledTimes(4);
   });

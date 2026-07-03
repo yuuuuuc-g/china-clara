@@ -1,7 +1,16 @@
 import { createClient } from "@supabase/supabase-js";
 import { createOpenAICompatibleClient } from "@/src/modules/ai/provider-adapter";
 import { createRagRepository } from "@/src/modules/rag/repository";
-import { MAX_QUERY_CHARS, runRetrievalAgent } from "@/src/modules/retrieval/agent";
+import {
+  type AiDomainEvent,
+  createDomainEventStream,
+  domainEventStreamHeaders,
+} from "@/src/lib/ai-domain-events";
+import {
+  MAX_QUERY_CHARS,
+  runRetrievalAgent,
+  type RetrievalAgentEvent,
+} from "@/src/modules/retrieval/agent";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -58,8 +67,66 @@ function isUuid(value: string): boolean {
   );
 }
 
-function toSseEvent(event: string, data: unknown): string {
-  return `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`;
+function toDomainEvent(event: RetrievalAgentEvent): AiDomainEvent {
+  if (event.type === "agent_started") {
+    return {
+      type: "retrieval.started",
+      query: event.data.query,
+      rewrittenQuery: event.data.rewrittenQuery,
+      maxIterations: event.data.maxIterations,
+    };
+  }
+
+  if (event.type === "tool_call_started") {
+    return {
+      type: "retrieval.query",
+      iteration: event.data.iteration,
+      query: event.data.query,
+      matchCount: event.data.matchCount,
+    };
+  }
+
+  if (event.type === "tool_call_result") {
+    return {
+      type: "retrieval.result",
+      iteration: event.data.iteration,
+      results: event.data.results,
+      retrievedChunks: event.data.retrievedChunks,
+    };
+  }
+
+  if (event.type === "model_delta") {
+    return {
+      type: "generation.delta",
+      iteration: event.data.iteration,
+      text: event.data.delta,
+    };
+  }
+
+  if (event.type === "iteration_summary") {
+    return {
+      type: "generation.step",
+      iteration: event.data.iteration,
+      retrievedChunks: event.data.retrievedChunks,
+      latencyMs: event.data.latencyMs,
+      label: event.data.continueReason,
+    };
+  }
+
+  if (event.type === "agent_finished") {
+    return {
+      type: "generation.finished",
+      text: event.data.answer,
+      results: event.data.results,
+      totalIterations: event.data.totalIterations,
+    };
+  }
+
+  return {
+    type: "generation.failed",
+    reason: event.data.reason,
+    message: event.data.message,
+  };
 }
 
 export async function POST(request: Request) {
@@ -103,14 +170,8 @@ export async function POST(request: Request) {
 
   try {
     const ragRepository = createRagRepository(createClient(supabaseUrl, supabaseKey));
-    const encoder = new TextEncoder();
-    const stream = new ReadableStream<Uint8Array>({
-      async start(controller) {
-        const sendEvent = (eventName: string, payload: unknown): void => {
-          controller.enqueue(encoder.encode(toSseEvent(eventName, payload)));
-        };
-
-        for await (const event of runRetrievalAgent({
+    const stream = createDomainEventStream(async (sendEvent) => {
+      for await (const event of runRetrievalAgent({
           query,
           bookUuid,
           queryRewriteClient: llmClient,
@@ -122,18 +183,12 @@ export async function POST(request: Request) {
             error: logServerError,
           },
         })) {
-          sendEvent(event.type, event.data);
-        }
-        controller.close();
-      },
+          sendEvent(toDomainEvent(event));
+      }
     });
 
     return new Response(stream, {
-      headers: {
-        "Cache-Control": "no-cache",
-        "Content-Type": "text/event-stream",
-        Connection: "keep-alive",
-      },
+      headers: domainEventStreamHeaders(),
       status: 200,
     });
   } catch (error) {

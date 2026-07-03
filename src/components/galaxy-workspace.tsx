@@ -10,26 +10,32 @@ import type { NodeData, NodesData } from "@/app/api/nodes/route";
 import { GalaxyNodes } from "@/src/components/canvas/GalaxyNodes";
 import { CopyButton } from "@/src/components/ui/CopyButton";
 import { useDevRenderCounter } from "@/src/lib/dev-render-profiler";
+import {
+  parseDomainSseFrame,
+  type AiDomainEvent,
+  type SearchDomainResult,
+} from "@/src/lib/ai-domain-events";
 
 const MAX_RENDERED_RESULTS = 3;
 const CHARACTER_LIMIT = 150;
 
 interface SourceItemProps {
-  result: SearchResult;
+  result: SearchDomainResult;
   rank: number;
 }
 
 function SourceItem({ result, rank }: SourceItemProps) {
   const [isExpanded, setIsExpanded] = useState(false);
-  const isTruncatable = result.content.length > CHARACTER_LIMIT;
+  const resultText = "content" in result ? result.content : result.preview;
+  const isTruncatable = resultText.length > CHARACTER_LIMIT;
   const displayContent =
     isTruncatable && !isExpanded
-      ? `${result.content.slice(0, CHARACTER_LIMIT)}...`
-      : result.content;
+      ? `${resultText.slice(0, CHARACTER_LIMIT)}...`
+      : resultText;
 
   return (
     <article className="relative rounded-xl border border-white/10 bg-white/[0.04] p-4">
-      <CopyButton textToCopy={result.content} />
+      <CopyButton textToCopy={resultText} />
       <div className="mb-2 flex items-center justify-between gap-3 pr-8">
         <div className="flex min-w-0 items-center gap-1 font-mono text-xs text-emerald-400/80">
           <span aria-hidden>◆</span>
@@ -68,31 +74,22 @@ interface NodesResponseBody {
   error?: string;
 }
 
-interface AgentToolCallResultEvent {
-  results?: unknown;
-}
-
 interface AgentLogEntry {
-  event: string;
+  event: AiDomainEvent["type"];
   summary: string;
   tone: "info" | "success" | "warn" | "error";
 }
 
 type AgentStatus = "idle" | "searching" | "streaming" | "finished" | "failed";
 
-interface ParsedSseFrame {
-  eventName: string;
-  payload: Record<string, unknown>;
-}
-
-function resolveAgentLogTone(eventName: string): AgentLogEntry["tone"] {
-  if (eventName === "agent_finished") {
+function resolveAgentLogTone(eventType: AiDomainEvent["type"]): AgentLogEntry["tone"] {
+  if (eventType === "generation.finished") {
     return "success";
   }
-  if (eventName === "agent_failed") {
+  if (eventType === "generation.failed") {
     return "error";
   }
-  if (eventName === "iteration_summary") {
+  if (eventType === "generation.step") {
     return "warn";
   }
   return "info";
@@ -111,9 +108,9 @@ function getAgentLogToneClass(tone: AgentLogEntry["tone"]): string {
   return "text-cyan-100/80";
 }
 
-function dedupeSearchResults(items: SearchResult[]): SearchResult[] {
+function dedupeSearchResults(items: SearchDomainResult[]): SearchDomainResult[] {
   const seen = new Set<string>();
-  const deduped: SearchResult[] = [];
+  const deduped: SearchDomainResult[] = [];
 
   for (const item of items) {
     const key =
@@ -134,18 +131,18 @@ interface GalaxyCanvasLayerProps {
   nodes: NodesData;
 }
 
-function isSearchResult(value: unknown): value is SearchResult {
+function isSearchDomainResult(value: unknown): value is SearchDomainResult {
   if (!value || typeof value !== "object") {
     return false;
   }
 
-  const row = value as Partial<SearchResult>;
+  const row = value as Partial<SearchDomainResult>;
 
   return (
     typeof row.id === "string" &&
-    typeof row.content === "string" &&
     typeof row.chapter_title === "string" &&
-    typeof row.similarity === "number"
+    typeof row.similarity === "number" &&
+    ("content" in row || "preview" in row)
   );
 }
 
@@ -203,7 +200,7 @@ interface GalaxyWorkspaceHudProps {
 function GalaxyWorkspaceHud({ onHighlightedNodeChange, nodesError }: GalaxyWorkspaceHudProps) {
   useDevRenderCounter("GalaxyWorkspace::HUD");
   const [query, setQuery] = useState("");
-  const [results, setResults] = useState<SearchResult[]>([]);
+  const [results, setResults] = useState<SearchDomainResult[]>([]);
   const [aiResponse, setAiResponse] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [isSearching, setIsSearching] = useState(false);
@@ -218,145 +215,80 @@ function GalaxyWorkspaceHud({ onHighlightedNodeChange, nodesError }: GalaxyWorks
   const shouldShowAgentLogs =
     aiResponse.trim().length === 0 && isSearching && agentStatus !== "finished";
 
-  function buildAgentLogSummary(eventName: string, payload: Record<string, unknown>): string {
+  function buildAgentLogSummary(event: AiDomainEvent): string {
     const iteration =
-      typeof payload.iteration === "number" && Number.isFinite(payload.iteration)
-        ? `#${payload.iteration}`
+      "iteration" in event &&
+      typeof event.iteration === "number" &&
+      Number.isFinite(event.iteration)
+        ? `#${event.iteration}`
         : null;
 
-    if (eventName === "agent_started") {
-      const rewrittenQuery =
-        typeof payload.rewrittenQuery === "string" ? payload.rewrittenQuery : "n/a";
-      return `start ${iteration ?? ""} rewritten="${rewrittenQuery}"`.trim();
+    if (event.type === "retrieval.started") {
+      return `start rewritten="${event.rewrittenQuery ?? event.query}"`;
     }
 
-    if (eventName === "tool_call_started") {
-      const toolName = typeof payload.toolName === "string" ? payload.toolName : "tool";
-      const query = typeof payload.query === "string" ? payload.query : "";
-      return `${toolName} ${iteration ?? ""} query="${query}"`.trim();
+    if (event.type === "retrieval.query") {
+      return `retrieve ${iteration ?? ""} query="${event.query}"`.trim();
     }
 
-    if (eventName === "tool_call_result") {
-      const retrievedChunks =
-        typeof payload.retrievedChunks === "number" ? payload.retrievedChunks : 0;
-      return `retrieved ${retrievedChunks} chunks ${iteration ?? ""}`.trim();
+    if (event.type === "retrieval.result") {
+      return `retrieved ${event.retrievedChunks} chunks ${iteration ?? ""}`.trim();
     }
 
-    if (eventName === "iteration_summary") {
-      const reason = typeof payload.continueReason === "string" ? payload.continueReason : "unknown";
-      return `summary ${iteration ?? ""} reason=${reason}`.trim();
+    if (event.type === "generation.step") {
+      return `step ${iteration ?? ""} label=${event.label}`.trim();
     }
 
-    if (eventName === "model_delta") {
-      const delta = typeof payload.delta === "string" ? payload.delta : "";
-      return `delta ${iteration ?? ""} "${delta}"`.trim();
+    if (event.type === "generation.delta") {
+      return `delta ${iteration ?? ""} "${event.text}"`.trim();
     }
 
-    if (eventName === "agent_finished") {
-      const totalIterations =
-        typeof payload.totalIterations === "number" ? payload.totalIterations : "n/a";
-      return `finished in ${totalIterations} iterations`;
+    if (event.type === "generation.finished") {
+      return `finished in ${event.totalIterations ?? "n/a"} iterations`;
     }
 
-    if (eventName === "agent_failed") {
-      const message = typeof payload.message === "string" ? payload.message : "failed";
-      return `failed ${iteration ?? ""} "${message}"`.trim();
+    if (event.type === "generation.failed") {
+      return `failed ${iteration ?? ""} "${event.message}"`.trim();
     }
 
-    return JSON.stringify(payload);
+    return "event";
   }
 
-  function appendAgentLog(eventName: string, payload: Record<string, unknown>) {
-    const summary = buildAgentLogSummary(eventName, payload);
-    const tone = resolveAgentLogTone(eventName);
-    setAgentLogs((current) => [...current, { event: eventName, summary, tone }]);
+  function appendAgentLog(event: AiDomainEvent) {
+    const summary = buildAgentLogSummary(event);
+    const tone = resolveAgentLogTone(event.type);
+    setAgentLogs((current) => [...current, { event: event.type, summary, tone }]);
   }
 
-  function parseSseFrame(frame: string): ParsedSseFrame | null {
-    const lines = frame
-      .split("\n")
-      .map((line) => line.replace(/\r$/, ""))
-      .filter((line) => line.length > 0 && !line.startsWith(":"));
-    let eventName = "message";
-    const dataLines: string[] = [];
-
-    for (const line of lines) {
-      if (line.startsWith("event:")) {
-        eventName = line.slice("event:".length).trim() || "message";
-        continue;
-      }
-      if (line.startsWith("data:")) {
-        dataLines.push(line.slice("data:".length).trim());
-      }
-    }
-
-    const dataValue = dataLines.join("\n").trim();
-
-    try {
-      if (dataValue.length === 0) {
-        return { eventName, payload: {} };
-      }
-
-      const parsed = JSON.parse(dataValue) as unknown;
-      if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
-        return {
-          eventName,
-          payload: parsed as Record<string, unknown>,
-        };
-      }
-
-      return {
-        eventName,
-        payload: { value: parsed },
-      };
-    } catch {
-      return {
-        eventName,
-        payload: { value: dataValue },
-      };
-    }
-  }
-
-  function handleAgentEvent(eventName: string, payload: Record<string, unknown>) {
-    if (eventName === "tool_call_result") {
-      const toolPayload = payload as AgentToolCallResultEvent;
-      const parsedResults = Array.isArray(toolPayload.results)
-        ? toolPayload.results.filter(isSearchResult).slice(0, MAX_RENDERED_RESULTS)
-        : [];
+  function handleAgentEvent(event: AiDomainEvent) {
+    if (event.type === "retrieval.result") {
+      const parsedResults = event.results.filter(isSearchDomainResult).slice(0, MAX_RENDERED_RESULTS);
       const safeResults = dedupeSearchResults(parsedResults).slice(0, MAX_RENDERED_RESULTS);
       // Keep right panel as the latest retrieval snapshot, not an accumulated list.
       setResults(safeResults);
       onHighlightedNodeChange(safeResults[0]?.id ?? null);
-      appendAgentLog(eventName, payload);
+      appendAgentLog(event);
       return;
     }
 
-    if (eventName === "model_delta") {
+    if (event.type === "generation.delta") {
       setAgentStatus("streaming");
       setIsSearching(false);
-      const delta =
-        typeof payload.delta === "string"
-          ? payload.delta
-          : typeof payload.value === "string"
-            ? payload.value
-            : "";
-      if (delta.length > 0) {
-        setAiResponse((current) => current + delta);
+      if (event.text.length > 0) {
+        setAiResponse((current) => current + event.text);
       }
       return;
     }
 
-    appendAgentLog(eventName, payload);
+    appendAgentLog(event);
 
-    if (eventName === "agent_failed") {
+    if (event.type === "generation.failed") {
       setAgentStatus("failed");
       setIsSearching(false);
-      const errorMessage =
-        typeof payload.message === "string" ? payload.message : "Search request failed.";
-      throw new Error(errorMessage);
+      throw new Error(event.message);
     }
 
-    if (eventName === "agent_finished") {
+    if (event.type === "generation.finished") {
       setAgentStatus("finished");
       setIsSearching(false);
     }
@@ -401,11 +333,11 @@ function GalaxyWorkspaceHud({ onHighlightedNodeChange, nodesError }: GalaxyWorks
           buffer = frames.pop() ?? "";
 
           for (const frame of frames) {
-            const parsedFrame = parseSseFrame(frame);
+            const parsedFrame = parseDomainSseFrame(frame);
             if (!parsedFrame) {
               continue;
             }
-            handleAgentEvent(parsedFrame.eventName, parsedFrame.payload);
+            handleAgentEvent(parsedFrame.event);
           }
         }
 
@@ -419,9 +351,9 @@ function GalaxyWorkspaceHud({ onHighlightedNodeChange, nodesError }: GalaxyWorks
         buffer += remainingText;
       }
       if (buffer.trim().length > 0) {
-        const parsedFrame = parseSseFrame(buffer);
+        const parsedFrame = parseDomainSseFrame(buffer);
         if (parsedFrame) {
-          handleAgentEvent(parsedFrame.eventName, parsedFrame.payload);
+          handleAgentEvent(parsedFrame.event);
         }
       }
     } catch (generationError) {

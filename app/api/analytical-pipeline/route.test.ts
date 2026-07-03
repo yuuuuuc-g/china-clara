@@ -92,6 +92,7 @@ describe("POST /api/analytical-pipeline", () => {
     });
 
     expect(response.status).toBe(200);
+    await expect(response.text()).resolves.toContain("event: generation.delta");
     expect(mocks.runLocalHybridSearch).not.toHaveBeenCalled();
     expect(mocks.streamText).toHaveBeenCalledTimes(1);
 
