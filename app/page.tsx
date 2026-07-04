@@ -6,7 +6,7 @@ import { Canvas } from "@react-three/fiber";
 import { OrbitControls, Stars, Environment } from "@react-three/drei";
 import * as THREE from "three";
 import { CoreStar } from "@/src/components/canvas/CoreStar";
-import { PLANETS, SolarSystem } from "@/src/components/canvas/SolarSystem";
+import { SolarSystem } from "@/src/components/canvas/SolarSystem";
 import { CameraController } from "@/src/components/canvas/CameraController";
 import { SolarBloom } from "@/src/components/canvas/SolarBloom";
 import { NodeDetailPanel } from "@/src/components/hud/NodeDetailPanel";
@@ -17,43 +17,12 @@ import { SaturnConsole } from "@/src/components/hud/SaturnConsole";
 import { MacroIntelConsole } from "@/src/components/hud/MacroIntelConsole";
 import { SocialSignalConsole } from "@/src/components/hud/SocialSignalConsole";
 import { SystemFrameConsole } from "@/src/components/hud/SystemFrameConsole";
-import { useSolarStore } from "@/src/store/solarStore";
 import { useDevRenderCounter } from "@/src/lib/dev-render-profiler";
 import {
   createCanvasRuntimeProfile,
   type CanvasRuntimeProfile,
 } from "@/src/modules/canvas/runtime-controller";
-
-type ActiveSystem =
-  | "analytical-pipeline"
-  | "archive"
-  | "knowledge-graph"
-  | "exocortex"
-  | "saturn"
-  | "macro-intel"
-  | "social-signals"
-  | null;
-
-const SYSTEM_FRAMES: Record<
-  Exclude<ActiveSystem, "archive" | "saturn" | "macro-intel" | "social-signals" | null>,
-  { eyebrow: string; title: string; src: string }
-> = {
-  "analytical-pipeline": {
-    eyebrow: "MARS // EXOCORTEX CRUCIBLE",
-    title: "The Crucible",
-    src: "/analytical-pipeline?embed=1",
-  },
-  "knowledge-graph": {
-    eyebrow: "JUPITER // NEXUS GRAPH",
-    title: "The Nexus",
-    src: "/knowledge-graph?embed=1",
-  },
-  exocortex: {
-    eyebrow: "NEPTUNE // RAG HUB",
-    title: "Exocortex",
-    src: "/exocortex",
-  },
-};
+import { useGalaxyShell } from "@/src/modules/galaxy-shell/useGalaxyShell";
 
 function WebGLWarning() {
   return (
@@ -142,15 +111,8 @@ export const MemoizedScene = memo(Scene);
 
 export default function Home() {
   useDevRenderCounter("Home::Root");
-  const focusedPlanet = useSolarStore((state) => state.focusedPlanet);
-  const setFocusedPlanet = useSolarStore((state) => state.setFocusedPlanet);
+  const shell = useGalaxyShell();
   const [webglLost, setWebglLost] = useState(false);
-  const [isConsoleOpen, setIsConsoleOpen] = useState(false);
-  const [activeSystem, setActiveSystem] = useState<ActiveSystem>(() => {
-    if (typeof window === "undefined") return null;
-    const system = new URLSearchParams(window.location.search).get("system");
-    return system === "archive" ? "archive" : null;
-  });
   const orbitTarget = useMemo<[number, number, number]>(() => [0, 0, 0], []);
   const deviceMemoryGb =
     typeof navigator !== "undefined" && "deviceMemory" in navigator
@@ -159,10 +121,10 @@ export default function Home() {
   const canvasRuntime = useMemo(
     () =>
       createCanvasRuntimeProfile({
-        overlayActive: isConsoleOpen || activeSystem !== null,
+        overlayActive: shell.isOverlayActive,
         deviceMemoryGb,
       }),
-    [activeSystem, deviceMemoryGb, isConsoleOpen]
+    [deviceMemoryGb, shell.isOverlayActive]
   );
 
   const handleContextLost = useCallback((event: Event) => {
@@ -189,103 +151,6 @@ export default function Home() {
     };
   }, [handleContextLost, handleContextRestored]);
 
-  useEffect(() => {
-    if (
-      ((activeSystem === "saturn" && focusedPlanet?.name !== "Saturn") ||
-        (activeSystem === "macro-intel" && focusedPlanet?.name !== "Uranus") ||
-        (activeSystem === "social-signals" && focusedPlanet?.module !== "social-signals"))
-    ) {
-      const timer = window.setTimeout(() => setActiveSystem(null), 0);
-      return () => window.clearTimeout(timer);
-    }
-    return undefined;
-  }, [activeSystem, focusedPlanet?.module, focusedPlanet?.name]);
-
-  useEffect(() => {
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === "Escape") {
-        setIsConsoleOpen(false);
-        setActiveSystem(null);
-      }
-    };
-
-    window.addEventListener("keydown", onKeyDown);
-    return () => {
-      window.removeEventListener("keydown", onKeyDown);
-    };
-  }, []);
-
-  useEffect(() => {
-    const onMessage = (event: MessageEvent) => {
-      if (event.origin !== window.location.origin) {
-        return;
-      }
-      if (
-        typeof event.data === "object" &&
-        event.data !== null &&
-        "type" in event.data &&
-        event.data.type === "knowledge-galaxy:close-system"
-      ) {
-        setActiveSystem(null);
-      }
-    };
-
-    window.addEventListener("message", onMessage);
-    return () => window.removeEventListener("message", onMessage);
-  }, []);
-
-  const handleSunConsolePlanetSelect = useCallback(
-    (planetId: string) => {
-      const selectedPlanet = PLANETS.find(
-        (planet) => planet.name.toLowerCase() === planetId.toLowerCase()
-      );
-      if (!selectedPlanet) {
-        return;
-      }
-      setFocusedPlanet(selectedPlanet);
-      if (selectedPlanet.name !== "Saturn") {
-        setActiveSystem(null);
-      }
-      setIsConsoleOpen(false);
-    },
-    [setFocusedPlanet]
-  );
-  const handleSunClick = useCallback(() => {
-    setIsConsoleOpen(true);
-  }, []);
-
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    const applyHashFocus = () => {
-      const hash = window.location.hash.replace(/^#/, "").toLowerCase();
-      if (!hash) return;
-      const candidate = PLANETS.find(
-        (planet) => planet.name.toLowerCase() === hash
-      );
-      if (candidate) {
-        setFocusedPlanet(candidate);
-      }
-    };
-    applyHashFocus();
-    window.addEventListener("hashchange", applyHashFocus);
-    return () => window.removeEventListener("hashchange", applyHashFocus);
-  }, [setFocusedPlanet]);
-
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    const system = new URLSearchParams(window.location.search).get("system");
-    if (system !== "archive") return;
-
-    const timer = window.setTimeout(() => {
-      const earth = PLANETS.find((planet) => planet.name === "Earth");
-      if (earth) {
-        setFocusedPlanet(earth);
-      }
-      setActiveSystem("archive");
-    }, 0);
-    return () => window.clearTimeout(timer);
-  }, [setFocusedPlanet]);
-
   return (
     <main className="relative h-screen w-screen bg-black">
       {webglLost && <WebGLWarning />}
@@ -293,69 +158,61 @@ export default function Home() {
       <GalaxyTerminalHUD />
 
       <MemoizedScene
-        hasFocusedPlanet={focusedPlanet !== null}
+        hasFocusedPlanet={shell.focusedPlanet !== null}
         orbitTarget={orbitTarget}
-        onSunClick={handleSunClick}
+        onSunClick={shell.commands.openSunConsole}
         runtime={canvasRuntime}
       />
 
-      {!activeSystem && (
+      {!shell.activeSystem && (
         <NodeDetailPanel
-          onEnterAnalyticalPipeline={() => setActiveSystem("analytical-pipeline")}
-          onEnterArchive={() => setActiveSystem("archive")}
-          onEnterKnowledgeGraph={() => setActiveSystem("knowledge-graph")}
-          onEnterExocortex={() => setActiveSystem("exocortex")}
-          onEnterMacroIntel={() => setActiveSystem("macro-intel")}
-          onEnterSocialSignals={() => setActiveSystem("social-signals")}
-          onOpenSaturnRadar={() => setActiveSystem("saturn")}
-          isRAGOpen={activeSystem === "exocortex"}
+          onEnterAnalyticalPipeline={shell.commands.openAnalyticalPipeline}
+          onEnterArchive={shell.commands.openArchive}
+          onEnterKnowledgeGraph={shell.commands.openKnowledgeGraph}
+          onEnterExocortex={shell.commands.openExocortex}
+          onEnterMacroIntel={shell.commands.openMacroIntel}
+          onEnterSocialSignals={shell.commands.openSocialSignals}
+          onOpenSaturnRadar={shell.commands.openSaturnRadar}
+          isRAGOpen={shell.activeSystem === "exocortex"}
         />
       )}
 
-      {activeSystem === "archive" && (
-        <ArchivePanel onClose={() => setActiveSystem(null)} />
+      {shell.activeSystem === "archive" && (
+        <ArchivePanel onClose={shell.commands.closeSystem} />
       )}
 
       <SunConsole
-        isOpen={isConsoleOpen}
-        onClose={() => setIsConsoleOpen(false)}
-        onPlanetSelect={handleSunConsolePlanetSelect}
+        isOpen={shell.isSunConsoleOpen}
+        onClose={shell.commands.closeSunConsole}
+        onPlanetSelect={shell.commands.selectPlanetFromSunConsole}
       />
 
       <SaturnConsole
-        isOpen={activeSystem === "saturn"}
-        onClose={() => setActiveSystem(null)}
+        isOpen={shell.activeSystem === "saturn"}
+        onClose={shell.commands.closeSystem}
       />
 
       <MacroIntelConsole
-        isOpen={activeSystem === "macro-intel"}
-        onClose={() => setActiveSystem(null)}
+        isOpen={shell.activeSystem === "macro-intel"}
+        onClose={shell.commands.closeSystem}
       />
 
       <SocialSignalConsole
-        isOpen={activeSystem === "social-signals"}
-        onClose={() => setActiveSystem(null)}
+        isOpen={shell.activeSystem === "social-signals"}
+        onClose={shell.commands.closeSystem}
       />
 
-      {activeSystem &&
-        activeSystem !== "archive" &&
-        activeSystem !== "saturn" &&
-        activeSystem !== "macro-intel" &&
-        activeSystem !== "social-signals" && (
-          <SystemFrameConsole
-            isOpen
-            onClose={() => setActiveSystem(null)}
-            src={SYSTEM_FRAMES[activeSystem].src}
-            title={SYSTEM_FRAMES[activeSystem].title}
-            eyebrow={SYSTEM_FRAMES[activeSystem].eyebrow}
-            fullBleed={activeSystem === "knowledge-graph"}
-            borderClassName={
-              activeSystem === "knowledge-graph"
-                ? "border-cyan-200/45 shadow-[0_0_90px_rgba(34,211,238,0.22)]"
-                : undefined
-            }
-          />
-        )}
+      {shell.systemFrame && (
+        <SystemFrameConsole
+          isOpen
+          onClose={shell.commands.closeSystem}
+          src={shell.systemFrame.src}
+          title={shell.systemFrame.title}
+          eyebrow={shell.systemFrame.eyebrow}
+          fullBleed={shell.systemFrame.fullBleed}
+          borderClassName={shell.systemFrame.borderClassName}
+        />
+      )}
     </main>
   );
 }

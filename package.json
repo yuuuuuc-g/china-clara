@@ -56,6 +56,7 @@
     "dotenv": "^17.4.2",
     "eslint": "^9",
     "eslint-config-next": "16.2.6",
+    "gitnexus": "^1.6.4",
     "jsdom": "^29.1.1",
     "tailwindcss": "^4",
     "typescript": "^5",

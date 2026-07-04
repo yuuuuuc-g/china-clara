@@ -50,6 +50,10 @@ Use the default five-state triage label vocabulary. See `docs/agents/triage-labe
 
 This is a single-context repo with `CONTEXT.md`, `docs/adr/`, and `docs/decisions/`. See `docs/agents/domain.md`.
 
+### GitNexus usage boundary
+
+GitNexus is project-local and should be invoked via `npx --no-install gitnexus`. Do not use GitNexus as a routine daily-development prerequisite. Only use it when building a large information map, taking over a fully unfamiliar legacy codebase, or doing macro-level architecture safety review.
+
 ## 🤖 Agent Workflow (Orchestration & Engineering Skills)
 You MUST read and adhere to the skills installed in the `.agents` directory before executing code changes. This project strictly follows the **Matt Pocock "Real Engineering" SOP**:
 

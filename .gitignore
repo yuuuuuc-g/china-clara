@@ -89,6 +89,7 @@ public/data/macro-raw-articles.json
 # ─────────────────────────────────────────────
 .scratch/
 .sisyphus/run-continuation/
+.gitnexus/
 
 # ─────────────────────────────────────────────
 # 13. Misc
