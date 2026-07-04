@@ -1,4 +1,5 @@
 import type { RefineryPhase } from "@/src/modules/refinery/phase";
+import { MAX_REFINERY_PROMPT_CHARS } from "@/src/modules/refinery/prompt-limits";
 
 export type WorkbenchView = "cards" | "tags" | "editor";
 export type NonFinalRefineryPhase = Exclude<RefineryPhase, "D">;
@@ -50,6 +51,8 @@ export interface AnalyticalSessionView {
 }
 
 export const phaseOrder: RefineryPhase[] = ["A", "B", "C", "D"];
+
+const PROMPT_TRUNCATION_NOTICE = "[内容已截断]";
 
 export const phaseMeta: Record<
   RefineryPhase,
@@ -410,18 +413,165 @@ export function buildPhasePrompt({
   const allKeywords = [selectedKeywords, ...customTags].filter(Boolean).join("\n");
 
   if (phase === "A") {
-    return `原始议题：\n${sourceText}`;
+    return renderBoundedPrompt([
+      { heading: "原始议题：", body: sourceText, weight: 1 },
+    ]);
   }
 
   if (phase === "B") {
-    return `原始议题：\n${sourceText}\n\nPhase A 完整输出：\n${archives.A}\n\n用户选中的 Briefing（选项原文）：\n${selectedBriefings}`;
+    return renderBoundedPrompt([
+      { heading: "原始议题：", body: sourceText, weight: 1 },
+      { heading: "Phase A 完整输出：", body: archives.A, weight: 3 },
+      {
+        heading: "用户选中的 Briefing（选项原文）：",
+        body: selectedBriefings,
+        weight: 2,
+      },
+    ]);
   }
 
   if (phase === "C") {
-    return `原始议题：\n${sourceText}\n\n用户选中的 Briefing（选项原文）：\n${selectedBriefings}\n\nPhase B 完整输出：\n${archives.B}\n\n用户选中的原子事件（选项原文）：\n${selectedEvents}`;
+    return renderBoundedPrompt([
+      { heading: "原始议题：", body: sourceText, weight: 1 },
+      {
+        heading: "用户选中的 Briefing（选项原文）：",
+        body: selectedBriefings,
+        weight: 2,
+      },
+      { heading: "Phase B 完整输出：", body: archives.B, weight: 3 },
+      {
+        heading: "用户选中的原子事件（选项原文）：",
+        body: selectedEvents,
+        weight: 2,
+      },
+    ]);
   }
 
-  return `原始议题：\n${sourceText}\n\n用户选中的 Briefing（选项原文）：\n${selectedBriefings}\n\n用户选中的原子事件（选项原文）：\n${selectedEvents}\n\nPhase C 完整输出：\n${archives.C}\n\n用户选中的关键词（选项原文）：\n${allKeywords}`;
+  return renderBoundedPrompt([
+    { heading: "原始议题：", body: sourceText, weight: 1 },
+    {
+      heading: "用户选中的 Briefing（选项原文）：",
+      body: selectedBriefings,
+      weight: 2,
+    },
+    {
+      heading: "用户选中的原子事件（选项原文）：",
+      body: selectedEvents,
+      weight: 2,
+    },
+    { heading: "Phase C 完整输出：", body: archives.C, weight: 3 },
+    {
+      heading: "用户选中的关键词（选项原文）：",
+      body: allKeywords,
+      weight: 3,
+    },
+  ]);
+}
+
+interface PromptSection {
+  heading: string;
+  body: string;
+  weight: number;
+}
+
+function renderBoundedPrompt(
+  sections: PromptSection[],
+  maxChars = MAX_REFINERY_PROMPT_CHARS,
+): string {
+  const fullPrompt = renderPromptSections(sections);
+  if (fullPrompt.length <= maxChars) {
+    return fullPrompt;
+  }
+
+  const overheadChars = sections.reduce((total, section, index) => {
+    const separatorChars = index === 0 ? 0 : 2;
+    return total + separatorChars + section.heading.length + 1;
+  }, 0);
+  const bodyBudget = maxChars - overheadChars;
+  if (bodyBudget <= 0) {
+    return fullPrompt.slice(0, maxChars);
+  }
+
+  const allocations = allocatePromptBodyChars(sections, bodyBudget);
+  const compactedSections = sections.map((section, index) => ({
+    ...section,
+    body: truncatePromptSection(section.body, allocations[index] ?? 0),
+  }));
+  const compactedPrompt = renderPromptSections(compactedSections);
+
+  if (compactedPrompt.length <= maxChars) {
+    return compactedPrompt;
+  }
+
+  return compactedPrompt.slice(0, maxChars);
+}
+
+function renderPromptSections(sections: PromptSection[]): string {
+  return sections
+    .map((section) => `${section.heading}\n${section.body}`)
+    .join("\n\n");
+}
+
+function allocatePromptBodyChars(
+  sections: PromptSection[],
+  bodyBudget: number,
+): number[] {
+  const allocations = sections.map(() => 0);
+  const expandableIndexes = sections
+    .map((section, index) => ({ index, section }))
+    .filter(({ section }) => section.body.length > 0);
+  const totalWeight = expandableIndexes.reduce(
+    (total, { section }) => total + section.weight,
+    0,
+  );
+
+  if (totalWeight <= 0) {
+    return allocations;
+  }
+
+  let remaining = bodyBudget;
+
+  for (const { index, section } of expandableIndexes) {
+    const allocation = Math.min(
+      section.body.length,
+      Math.floor((bodyBudget * section.weight) / totalWeight),
+    );
+    allocations[index] = allocation;
+    remaining -= allocation;
+  }
+
+  while (remaining > 0) {
+    const nextIndex = expandableIndexes.find(
+      ({ index, section }) => allocations[index] < section.body.length,
+    )?.index;
+    if (nextIndex === undefined) {
+      break;
+    }
+    allocations[nextIndex] += 1;
+    remaining -= 1;
+  }
+
+  return allocations;
+}
+
+function truncatePromptSection(text: string, maxChars: number): string {
+  if (text.length <= maxChars) {
+    return text;
+  }
+
+  if (maxChars <= PROMPT_TRUNCATION_NOTICE.length) {
+    return PROMPT_TRUNCATION_NOTICE.slice(0, maxChars);
+  }
+
+  const contentBudget = maxChars - PROMPT_TRUNCATION_NOTICE.length;
+  const headChars = Math.ceil(contentBudget * 0.65);
+  const tailChars = contentBudget - headChars;
+
+  return [
+    text.slice(0, headChars),
+    PROMPT_TRUNCATION_NOTICE,
+    tailChars > 0 ? text.slice(-tailChars) : "",
+  ].join("");
 }
 
 function canRequestPhaseRun(

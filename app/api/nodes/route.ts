@@ -1,4 +1,5 @@
 import { createClient } from "@supabase/supabase-js";
+import { getSupabaseAdminEnv } from "@/src/lib/env";
 import { createRagRepository, type RagNode } from "@/src/modules/rag/repository";
 
 export const runtime = "nodejs";
@@ -20,27 +21,14 @@ function logServerError(context: string, error: unknown) {
   console.error(`[Nodes API] ${context}:`, error);
 }
 
-function getRequiredEnv(name: string): string {
-  const value = process.env[name];
-
-  if (!value) {
-    throw new Error(`Missing required environment variable: ${name}`);
-  }
-
-  return value;
-}
-
-function getRequiredSupabaseKey(): string {
-  return process.env.SUPABASE_SERVICE_ROLE_KEY ?? getRequiredEnv("SUPABASE_KEY");
-}
-
 export async function GET() {
   let supabaseUrl: string;
   let supabaseKey: string;
 
   try {
-    supabaseUrl = getRequiredEnv("SUPABASE_URL");
-    supabaseKey = getRequiredSupabaseKey();
+    const env = getSupabaseAdminEnv();
+    supabaseUrl = env.supabaseUrl;
+    supabaseKey = env.supabaseKey;
   } catch (error) {
     logServerError("missing configuration", error);
     return jsonError("Nodes gateway is not configured.", 500);

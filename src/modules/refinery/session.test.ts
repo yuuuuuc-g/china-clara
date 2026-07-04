@@ -8,6 +8,7 @@ import {
   extractOptionBlocks,
   sanitizeStreamingOutput,
 } from "./session";
+import { MAX_REFINERY_PROMPT_CHARS } from "./prompt-limits";
 
 describe("Analytical Session", () => {
   it("parses markdown list items as option blocks with continuation lines", () => {
@@ -121,6 +122,36 @@ describe("Analytical Session", () => {
     );
     expect(prompt).toContain("Phase C 完整输出：\nPhase C archive");
     expect(prompt).toContain("关键词：跨境支付\n稳定币清算");
+  });
+
+  it("bounds long phase prompts to the analytical pipeline API limit", () => {
+    const prompt = buildPhasePrompt({
+      phase: "D",
+      sourceText: "APAC 合规变化".repeat(300),
+      archives: {
+        A: "",
+        B: "",
+        C: "Phase C archive detail\n".repeat(300),
+      },
+      selectedItems: {
+        A: {
+          "A:0": "标题：超长 briefing\n摘要：".concat("供应链与监管变化".repeat(200)),
+        },
+        B: {
+          "B:0": "事件：监管听证\n说明：".concat("跨境支付清算争议".repeat(200)),
+        },
+        C: {
+          "C:0": "关键词：跨境支付".concat("稳定币清算".repeat(200)),
+        },
+      },
+      customTags: ["地缘金融风险".repeat(100)],
+    });
+
+    expect(prompt.length).toBeLessThanOrEqual(MAX_REFINERY_PROMPT_CHARS);
+    expect(prompt).toContain("原始议题：");
+    expect(prompt).toContain("Phase C 完整输出：");
+    expect(prompt).toContain("用户选中的关键词（选项原文）：");
+    expect(prompt).toContain("[内容已截断]");
   });
 
   it("adds topic context to final draft requests without leaking it into earlier phases", () => {

@@ -6,6 +6,7 @@ import {
   normalizeXRecentSearchResponse,
 } from "@/src/modules/social-signals/x-signals";
 import type { SocialSignalRepositoryLike } from "@/src/modules/social-signals/repository";
+import { getOptionalEnv } from "@/src/lib/env";
 
 export type FetchLike = (
   input: string | URL,
@@ -88,7 +89,7 @@ function createProxyDispatcher(proxyUrl: string) {
 }
 
 function createXApiProxyDispatcherFromEnv(): ProxyAgent | Socks5ProxyAgent | undefined {
-  const explicitProxy = process.env.X_API_PROXY;
+  const explicitProxy = getOptionalEnv("X_API_PROXY");
   if (explicitProxy) {
     return createProxyDispatcher(explicitProxy);
   }

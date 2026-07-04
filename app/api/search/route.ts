@@ -1,4 +1,5 @@
 import { createClient } from "@supabase/supabase-js";
+import { getSupabaseAdminEnv } from "@/src/lib/env";
 import { createOpenAICompatibleClient } from "@/src/modules/ai/provider-adapter";
 import { createRagRepository } from "@/src/modules/rag/repository";
 import {
@@ -45,20 +46,6 @@ async function readSearchRequest(request: Request): Promise<SearchRequestBody | 
   } catch {
     return null;
   }
-}
-
-function getRequiredEnv(name: string): string {
-  const value = process.env[name];
-
-  if (!value) {
-    throw new Error(`Missing required environment variable: ${name}`);
-  }
-
-  return value;
-}
-
-function getRequiredSupabaseKey(): string {
-  return process.env.SUPABASE_SERVICE_ROLE_KEY ?? getRequiredEnv("SUPABASE_KEY");
 }
 
 function isUuid(value: string): boolean {
@@ -158,8 +145,9 @@ export async function POST(request: Request) {
   let agentClient: ReturnType<typeof createOpenAICompatibleClient>;
 
   try {
-    supabaseUrl = getRequiredEnv("SUPABASE_URL");
-    supabaseKey = getRequiredSupabaseKey();
+    const env = getSupabaseAdminEnv();
+    supabaseUrl = env.supabaseUrl;
+    supabaseKey = env.supabaseKey;
     llmClient = createOpenAICompatibleClient("gemini");
     embeddingClient = createOpenAICompatibleClient("siliconflow");
     agentClient = createOpenAICompatibleClient("deepseek");

@@ -10,6 +10,8 @@ import {
   createDomainEventStream,
   domainEventStreamHeaders,
 } from "@/src/lib/ai-domain-events";
+import { getOptionalEnv, getSupabaseAdminEnv } from "@/src/lib/env";
+import { MAX_REFINERY_PROMPT_CHARS } from "@/src/modules/refinery/prompt-limits";
 
 interface RefineryRequestBody {
   prompt?: unknown;
@@ -18,17 +20,12 @@ interface RefineryRequestBody {
   bookUuid?: unknown;
 }
 
-const MAX_PROMPT_CHARS = 4_000;
 const MAX_TOPIC_TITLE_CHARS = 200;
 
 function isUuid(value: string): boolean {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
     value
   );
-}
-
-function getRequiredSupabaseKey(): string {
-  return process.env.SUPABASE_SERVICE_ROLE_KEY ?? process.env.SUPABASE_KEY ?? "";
 }
 
 async function readRefineryRequest(request: Request): Promise<RefineryRequestBody | null> {
@@ -71,15 +68,18 @@ export async function POST(request: Request) {
     return Response.json({ error: "A non-empty prompt string is required." }, { status: 400 });
   }
   const trimmedPrompt = prompt.trim();
-  if (trimmedPrompt.length > MAX_PROMPT_CHARS) {
+  if (trimmedPrompt.length > MAX_REFINERY_PROMPT_CHARS) {
     return Response.json(
-      { error: `Prompt must be ${MAX_PROMPT_CHARS} characters or fewer.` },
+      { error: `Prompt must be ${MAX_REFINERY_PROMPT_CHARS} characters or fewer.` },
       { status: 413 }
     );
   }
 
-  const supabaseKey = getRequiredSupabaseKey();
-  if (!process.env.SILICONFLOW_API_KEY || !process.env.SUPABASE_URL || !supabaseKey) {
+  let supabaseEnv: ReturnType<typeof getSupabaseAdminEnv>;
+  try {
+    supabaseEnv = getSupabaseAdminEnv();
+  } catch (error) {
+    console.error("[Analytical Pipeline API] missing Supabase configuration:", error);
     return Response.json(
       { error: "Local knowledge retrieval is not configured." },
       { status: 500 }
@@ -88,7 +88,7 @@ export async function POST(request: Request) {
 
   let model: LanguageModel;
   try {
-    model = process.env.REFINERY_MODEL === "kimi"
+    model = getOptionalEnv("REFINERY_MODEL") === "kimi"
       ? createAiSdkLanguageModel("kimi")
       : createAiSdkLanguageModel("deepseek");
   } catch (error) {
@@ -97,7 +97,7 @@ export async function POST(request: Request) {
   }
 
   const embeddingClient = createOpenAICompatibleClient("siliconflow");
-  const ragRepository = createRagRepository(createClient(process.env.SUPABASE_URL, supabaseKey));
+  const ragRepository = createRagRepository(createClient(supabaseEnv.supabaseUrl, supabaseEnv.supabaseKey));
   const result = runRefineryPhase({
     model,
     prompt: trimmedPrompt,

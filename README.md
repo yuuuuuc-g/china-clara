@@ -67,6 +67,19 @@ Required for production cron protection:
 CRON_SECRET=
 ```
 
+Required for site-wide Basic Auth in production:
+
+```bash
+SITE_PASSWORD=
+```
+
+Required for X social signal ingestion:
+
+```bash
+X_BEARER_TOKEN=
+X_API_PROXY=
+```
+
 AI provider variables, depending on which modules you run:
 
 ```bash
@@ -325,6 +338,19 @@ SUPABASE_SERVICE_ROLE_KEY=
 
 ```bash
 CRON_SECRET=
+```
+
+生产环境全站 Basic Auth 需要：
+
+```bash
+SITE_PASSWORD=
+```
+
+X social signal 抓取需要：
+
+```bash
+X_BEARER_TOKEN=
+X_API_PROXY=
 ```
 
 AI provider 相关变量按需配置：
