@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createSupabaseAdmin } from "@/src/lib/supabase/admin";
+import { isUuid } from "@/src/lib/uuid";
 import {
   ArchiveRepositoryError,
   createArchiveRepository,
@@ -10,12 +11,6 @@ export const dynamic = "force-dynamic";
 
 interface ArchiveDocumentRouteContext {
   params: Promise<{ id: string }>;
-}
-
-function isUuid(value: string): boolean {
-  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{12}$/i.test(
-    value
-  );
 }
 
 export async function DELETE(_request: Request, context: ArchiveDocumentRouteContext) {

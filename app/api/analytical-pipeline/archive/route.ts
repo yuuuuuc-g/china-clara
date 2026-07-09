@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import type { Json } from "@/src/lib/database.types";
 import { createSupabaseAdmin } from "@/src/lib/supabase/admin";
+import { isUuid } from "@/src/lib/uuid";
 import {
   ArchiveRepositoryError,
   createArchiveRepository,
@@ -17,12 +18,6 @@ interface PersistArchiveBody {
   sourceText?: unknown;
   selectedTopicId?: unknown;
   phases?: unknown;
-}
-
-function isUuid(value: string): boolean {
-  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{12}$/i.test(
-    value
-  );
 }
 
 function isJsonObject(value: unknown): value is Record<string, Json> {

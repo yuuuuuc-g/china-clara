@@ -1,7 +1,11 @@
 import { createClient } from "@supabase/supabase-js";
 import { getSupabaseAdminEnv } from "@/src/lib/env";
-import { createOpenAICompatibleClient } from "@/src/modules/ai/provider-adapter";
+import {
+  createOpenAICompatibleClient,
+  resolveAiProviderConfig,
+} from "@/src/modules/ai/provider-adapter";
 import { createRagRepository } from "@/src/modules/rag/repository";
+import { isUuid } from "@/src/lib/uuid";
 import {
   type AiDomainEvent,
   createDomainEventStream,
@@ -46,12 +50,6 @@ async function readSearchRequest(request: Request): Promise<SearchRequestBody | 
   } catch {
     return null;
   }
-}
-
-function isUuid(value: string): boolean {
-  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
-    value
-  );
 }
 
 function toDomainEvent(event: RetrievalAgentEvent): AiDomainEvent {
@@ -143,6 +141,8 @@ export async function POST(request: Request) {
   let llmClient: ReturnType<typeof createOpenAICompatibleClient>;
   let embeddingClient: ReturnType<typeof createOpenAICompatibleClient>;
   let agentClient: ReturnType<typeof createOpenAICompatibleClient>;
+  let queryRewriteModel: string;
+  let agentModel: string;
 
   try {
     const env = getSupabaseAdminEnv();
@@ -151,6 +151,8 @@ export async function POST(request: Request) {
     llmClient = createOpenAICompatibleClient("gemini");
     embeddingClient = createOpenAICompatibleClient("siliconflow");
     agentClient = createOpenAICompatibleClient("deepseek");
+    queryRewriteModel = resolveAiProviderConfig("gemini").defaultModel;
+    agentModel = resolveAiProviderConfig("deepseek").defaultModel;
   } catch (error) {
     logServerError("missing configuration", error);
     return jsonError("Search gateway is not configured.", 500);
@@ -166,6 +168,7 @@ export async function POST(request: Request) {
           agentClient,
           embeddingClient,
           ragRepository,
+          models: { agent: agentModel, queryRewrite: queryRewriteModel },
           log: {
             info: (message) => console.log(message),
             error: logServerError,

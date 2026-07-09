@@ -24,25 +24,9 @@ const envString = z.preprocess(
   z.string().min(1)
 );
 
-const optionalEnvString = z.preprocess(
-  (value) => {
-    if (typeof value !== "string") return value;
-    const trimmed = value.trim();
-    return trimmed.length > 0 ? trimmed : undefined;
-  },
-  z.string().min(1).optional()
-);
-
 const publicSupabaseSchema = z.object({
   NEXT_PUBLIC_SUPABASE_URL: envString,
   NEXT_PUBLIC_SUPABASE_ANON_KEY: envString,
-});
-
-const supabaseAdminSchema = z.object({
-  NEXT_PUBLIC_SUPABASE_URL: optionalEnvString,
-  SUPABASE_URL: optionalEnvString,
-  SUPABASE_KEY: optionalEnvString,
-  SUPABASE_SERVICE_ROLE_KEY: optionalEnvString,
 });
 
 function currentEnv(env?: RuntimeEnv): RuntimeEnv {
@@ -90,7 +74,6 @@ export function getPublicSupabaseEnv(env?: RuntimeEnv): PublicSupabaseEnv {
 
 export function getSupabaseAdminEnv(env?: RuntimeEnv): SupabaseAdminEnv {
   const runtimeEnv = currentEnv(env);
-  supabaseAdminSchema.parse(runtimeEnv);
 
   const supabaseUrl = readFirstEnv(runtimeEnv, [
     "SUPABASE_URL",
