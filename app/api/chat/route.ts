@@ -115,11 +115,10 @@ export async function POST(request: Request) {
     });
 
     return new Response(stream, {
-      // ✨ 修正 2：补齐标准的 Server-Sent Events (SSE) 头，防止某些浏览器拒收流式数据
+      // Raw UTF-8 token stream (not SSE-framed), so label it as plain text.
       headers: {
         "Cache-Control": "no-cache",
-        "Content-Type": "text/event-stream",
-        "Connection": "keep-alive",
+        "Content-Type": "text/plain; charset=utf-8",
       },
       status: 200,
     });

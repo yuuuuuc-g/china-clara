@@ -1,8 +1,31 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 
+/**
+ * Constant-time string comparison, safe for the Edge runtime.
+ *
+ * We SHA-256 both inputs to fixed-length digests first so the byte-by-byte
+ * loop never short-circuits on length, then diff the digests without early
+ * return. This avoids leaking the password via response timing.
+ */
+async function timingSafeEqual(a: string, b: string): Promise<boolean> {
+  const encoder = new TextEncoder();
+  const [digestA, digestB] = await Promise.all([
+    crypto.subtle.digest('SHA-256', encoder.encode(a)),
+    crypto.subtle.digest('SHA-256', encoder.encode(b)),
+  ]);
+
+  const bytesA = new Uint8Array(digestA);
+  const bytesB = new Uint8Array(digestB);
+  let diff = 0;
+  for (let i = 0; i < bytesA.length; i += 1) {
+    diff |= bytesA[i] ^ bytesB[i];
+  }
+  return diff === 0;
+}
+
 // 🚀 核心修正：函数名从 middleware 改为了 proxy
-export function proxy(req: NextRequest) {
+export async function proxy(req: NextRequest) {
   const basicAuth = req.headers.get('authorization');
   // 使用方括号语法，强制运行时读取，防止 Webpack 静态替换
   const expectedPassword = process.env['SITE_PASSWORD'];
@@ -27,7 +50,7 @@ export function proxy(req: NextRequest) {
         const user = decodedValue.substring(0, separatorIndex);
         const pwd = decodedValue.substring(separatorIndex + 1);
 
-        if (user === 'admin' && pwd === expectedPassword) {
+        if (user === 'admin' && (await timingSafeEqual(pwd, expectedPassword))) {
           return NextResponse.next();
         }
       }

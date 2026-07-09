@@ -187,4 +187,34 @@ describe("runRetrievalAgent", () => {
       },
     });
   });
+
+  it("sends the injected model ids to each client", async () => {
+    const rewriteCreate = vi.fn().mockResolvedValue({
+      choices: [{ message: { content: "扩写查询" } }],
+    });
+    const agentCreate = vi.fn().mockResolvedValue({
+      choices: [{ message: { content: "最终答案。" } }],
+    });
+
+    await collectEvents(
+      runRetrievalAgent({
+        query: "规则如何促进合作？",
+        models: { agent: "custom-agent-model", queryRewrite: "custom-rewrite-model" },
+        queryRewriteClient: { chat: { completions: { create: rewriteCreate } } },
+        embeddingClient: {
+          embeddings: {
+            create: vi.fn().mockResolvedValue({ data: [{ embedding: [0.1] }] }),
+          },
+        },
+        agentClient: { chat: { completions: { create: agentCreate } } },
+        ragRepository: {
+          searchChunks: vi.fn().mockResolvedValue(evidence),
+          toSearchResultCitations: () => [],
+        },
+      })
+    );
+
+    expect(rewriteCreate.mock.calls[0][0]).toMatchObject({ model: "custom-rewrite-model" });
+    expect(agentCreate.mock.calls[0][0]).toMatchObject({ model: "custom-agent-model" });
+  });
 });

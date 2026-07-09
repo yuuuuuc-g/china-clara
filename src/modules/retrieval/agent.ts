@@ -158,6 +158,11 @@ export interface RetrievalAgentConfig {
   matchCount?: number;
 }
 
+export interface RetrievalAgentModels {
+  agent?: string;
+  queryRewrite?: string;
+}
+
 export interface RunRetrievalAgentInput {
   query: string;
   bookUuid?: string;
@@ -166,6 +171,12 @@ export interface RunRetrievalAgentInput {
   embeddingClient: EmbeddingClient;
   ragRepository: Pick<RagRepository, "searchChunks" | "toSearchResultCitations">;
   config?: RetrievalAgentConfig;
+  /**
+   * Model ids to send to each client. When omitted, the module-level defaults
+   * are used. Callers should pass the provider-adapter's resolved defaults so
+   * env overrides (e.g. DEEPSEEK_MODEL / GEMINI_MODEL) stay in effect.
+   */
+  models?: RetrievalAgentModels;
   log?: {
     info?(message: string): void;
     error?(context: string, error: unknown): void;
@@ -252,14 +263,15 @@ function createAbortSignal(timeoutMs: number): {
 async function rewriteQuery(
   llmClient: RetrievalChatClient,
   query: string,
-  timeoutMs: number
+  timeoutMs: number,
+  model: string
 ): Promise<string> {
   const abortSignal = createAbortSignal(timeoutMs);
 
   try {
     const completion = await llmClient.chat.completions.create(
       {
-        model: QUERY_REWRITE_MODEL,
+        model,
         messages: [
           { role: "system", content: QUERY_REWRITE_SYSTEM_PROMPT },
           { role: "user", content: query },
@@ -305,10 +317,13 @@ export async function* runRetrievalAgent(
   input: RunRetrievalAgentInput
 ): AsyncGenerator<RetrievalAgentEvent> {
   const config = getConfig(input.config);
+  const agentModel = input.models?.agent ?? AGENT_MODEL;
+  const queryRewriteModel = input.models?.queryRewrite ?? QUERY_REWRITE_MODEL;
   const rewrittenQuery = await rewriteQuery(
     input.queryRewriteClient,
     input.query,
-    config.queryRewriteTimeoutMs
+    config.queryRewriteTimeoutMs,
+    queryRewriteModel
   );
   input.log?.info?.(`[Query Rewrite] 原始: ${input.query} -> 扩写: ${rewrittenQuery}`);
 
@@ -335,7 +350,7 @@ export async function* runRetrievalAgent(
       try {
         const completion = await input.agentClient.chat.completions.create(
           {
-            model: AGENT_MODEL,
+            model: agentModel,
             messages,
             tools: [buildSearchToolDefinition()],
             tool_choice: "auto",

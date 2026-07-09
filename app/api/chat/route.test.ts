@@ -78,7 +78,7 @@ describe("POST /api/chat", () => {
 
     await expect(response.text()).resolves.toBe("制度降低交易成本");
     expect(response.status).toBe(200);
-    expect(response.headers.get("Content-Type")).toContain("text/event-stream");
+    expect(response.headers.get("Content-Type")).toContain("text/plain");
     expect(mocks.openAIConstructor).toHaveBeenCalledWith({
       apiKey: "openrouter-key",
       baseURL: "https://openrouter.ai/api/v1",
