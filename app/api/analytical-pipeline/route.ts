@@ -11,6 +11,7 @@ import {
   domainEventStreamHeaders,
 } from "@/src/lib/ai-domain-events";
 import { getOptionalEnv, getSupabaseAdminEnv } from "@/src/lib/env";
+import { isUuid } from "@/src/lib/uuid";
 import { MAX_REFINERY_PROMPT_CHARS } from "@/src/modules/refinery/prompt-limits";
 
 interface RefineryRequestBody {
@@ -21,12 +22,6 @@ interface RefineryRequestBody {
 }
 
 const MAX_TOPIC_TITLE_CHARS = 200;
-
-function isUuid(value: string): boolean {
-  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
-    value
-  );
-}
 
 async function readRefineryRequest(request: Request): Promise<RefineryRequestBody | null> {
   try {

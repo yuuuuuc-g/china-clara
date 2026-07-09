@@ -3,10 +3,10 @@
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from "react";
 import { parseDomainSseFrame } from "@/src/lib/ai-domain-events";
 import {
-  createSupabaseArchivePersistence,
+  listTopics,
+  saveAnalyticalDocument,
   type ArchiveTopic,
-} from "@/src/lib/archive-persistence";
-import { createClient } from "@/src/lib/supabase/client";
+} from "@/src/lib/archive-api";
 import type { RefineryPhase } from "@/src/modules/refinery/phase";
 import {
   analyticalSessionReducer,
@@ -68,8 +68,7 @@ export function useAnalyticalSession(): AnalyticalSessionController {
     async function fetchTopics() {
       console.log("[Topics] Starting to load topics...");
       try {
-        const archivePersistence = createSupabaseArchivePersistence(createClient());
-        const nextTopics = await archivePersistence.listTopics();
+        const nextTopics = await listTopics();
         if (active) {
           console.log("[Topics] Successfully loaded topics:", nextTopics.length, nextTopics);
           setTopics(nextTopics);
@@ -244,8 +243,7 @@ export function useAnalyticalSession(): AnalyticalSessionController {
     setSaveError(null);
 
     try {
-      const archivePersistence = createSupabaseArchivePersistence(createClient());
-      const result = await archivePersistence.saveAnalyticalDocument({
+      const result = await saveAnalyticalDocument({
         content,
         sourceIssue: state.sourceText,
         archives: state.archives,

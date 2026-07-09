@@ -5,11 +5,11 @@ import { useRouter } from "next/navigation";
 import { Trash2, X } from "lucide-react";
 import { downloadAllDocumentsAsJson } from "@/src/lib/export-utils";
 import { DialogFrame } from "@/src/components/ui/DialogFrame";
-import { createClient } from "@/src/lib/supabase/client";
 import {
-  createSupabaseArchivePersistence,
+  deleteDocument,
+  listDocuments,
   type ArchiveDocument,
-} from "@/src/lib/archive-persistence";
+} from "@/src/lib/archive-api";
 
 interface ArchivePanelProps {
   onClose: () => void;
@@ -26,8 +26,7 @@ export function ArchivePanel({ onClose }: ArchivePanelProps) {
 
     async function loadDocuments() {
       try {
-        const archivePersistence = createSupabaseArchivePersistence(createClient());
-        const nextDocuments = await archivePersistence.listDocuments();
+        const nextDocuments = await listDocuments();
         if (active) {
           setDocuments(nextDocuments);
         }
@@ -60,8 +59,7 @@ export function ArchivePanel({ onClose }: ArchivePanelProps) {
 
     setDeletingId(id);
     try {
-      const archivePersistence = createSupabaseArchivePersistence(createClient());
-      await archivePersistence.deleteDocument(id);
+      await deleteDocument(id);
       setDocuments((current) => current.filter((doc) => doc.id !== id));
     } catch (error) {
       console.error("[ArchivePanel] delete failed:", error);
