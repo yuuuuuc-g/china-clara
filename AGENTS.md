@@ -1,28 +1,21 @@
-# Exocortex & Cognitive Refinery Project Guidelines
+# Knowledge Galaxy Project Guidelines
 
 ## 🛠 Project Stack
 - **Framework**: Next.js (App Router)
 - **3D Engine**: @react-three/fiber + @react-three/drei (Three.js)
-- **AI Core**: Vercel AI SDK (`streamText` only, standard markdown generation)
-- **Database**: Supabase (PostgreSQL)
-- **Editor & UI**: TipTap (Edit Mode), `react-markdown` (Read Mode), Tailwind CSS + Typography (`prose-invert`)
-- **Animations**: Framer Motion 3D / Framer Motion
+- **UI**: Tailwind CSS
+- **Animations**: Framer Motion / Framer Motion 3D
+- **State**: Zustand
 - **Type Safety**: Strict TypeScript (Matt Pocock Style)
+
+This branch is the frontend UI shell only.
+All backend functionality (Supabase, AI pipelines, RAG, intelligence ingestion, cron jobs) has been removed.
 
 ## 🏛 Architecture Patterns
 - **Canvas-First (3D)**: `page.tsx` should only contain the `<Canvas>` and HUD containers. Celestial bodies (Star, Planet, Belt) are strictly split into `src/components/canvas/`.
-- **Z-Index Strategy**: 
+- **Z-Index Strategy**:
   - `Z-Index 0`: Three.js Canvas
-  - `Z-Index 10`: HUD Overlays & Modals (e.g., Earth Portal UI)
-- **Cognitive Funnel (Refinery)**: State-machine driven workflow (`Phase A` -> `B` -> `C` -> `D`).
-- **Parser Robustness**: Strictly parse AI streaming text using Markdown list items (`- ` or `* `) via `split('\n')`. Do NOT use fragile Regex block matching.
-- **Read/Edit Decoupling**: Phase D must separate rendering into two distinct states:
-  - Read Mode: `<ReactMarkdown>` for beautiful, uneditable typography.
-  - Edit Mode: `TipTap` for immersive text modification.
-
-## 🗄️ Database Standards (Supabase)
-- **Primary Keys**: Always use `uuid` (generated via `uuid_generate_v4()` in Supabase), never `int8`.
-- **Client Initialization**: Centralized in `src/lib/supabase.ts` using `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY`.
+  - `Z-Index 10+`: HUD Overlays & Panels
 
 ## 🧩 TypeScript Standards (Matt Pocock Style)
 - **Ref Typing**: Explicit Three.js types for refs (e.g., `useRef<THREE.Group>(null!)`).
@@ -34,7 +27,7 @@
 - **3D Instancing**: Use `Instances` or `Merged` for repetitive objects (asteroids, starfields).
 - **Asset Management**: Always use `useGLTF.preload` for 3D models.
 - **Frame Looping**: Use `useFrame` sparingly. Dispose of geometries/materials on unmount.
-- **State Cleanup**: Always clear `useCompletion` text states (`setCompletion("")`) when transitioning between Refinery phases to prevent memory leaks and UI ghosting.
+- **High-Frequency State Isolation**: Never store high-frequency values in components wrapping `<Canvas>` or in global state. See `docs/decisions/001-r3f-streaming-isolation.md`.
 
 ## Agent skills
 
@@ -62,17 +55,17 @@ You MUST read and adhere to the skills installed in the `.agents` directory befo
 
 2. **Planning & Alignment (Before Coding)**
    - Do NOT start writing code immediately.
-   - Use **`/grill-with-docs`**: When tackling a complex task (e.g., Supabase integration or 3D interactions), interrogate the user to challenge the plan against the existing domain model. Update `CONTEXT.md` and ADRs inline.
+   - Use **`/grill-with-docs`**: When tackling a complex task, interrogate the user to challenge the plan against the existing domain model. Update `CONTEXT.md` and ADRs inline.
    - Use **`/to-prd`**: After grilling, synthesize the conversation into a PRD to solidify the architecture.
 
 3. **Implementation Strategy**
-   - Use **`/prototype`**: For unproven integrations (e.g., testing Supabase writes or novel 3D HUD toggles), build a throwaway prototype first to resolve state/logic uncertainties before merging into the main codebase.
+   - Use **`/prototype`**: For unproven integrations (e.g., novel 3D HUD toggles), build a throwaway prototype first to resolve state/logic uncertainties before merging into the main codebase.
    - Use **`/tdd`**: When writing utility functions or core data transformations, adopt a red-green-refactor loop. Build vertical slices.
 
 4. **Debugging & Refactoring**
    - Use **`/diagnose`**: If encountering React rendering loops or 3D canvas crashes, follow the strict diagnosis loop: reproduce → minimise → hypothesise → instrument → fix → regression-test.
-   - Use **`/improve-codebase-architecture`**: Periodically analyze the component tree (e.g., `page.tsx` and `Earth.tsx`) to find deepening opportunities, guided by the domain language in `CONTEXT.md`.
-   - Use **`/zoom-out`**: If stuck on localized state management, zoom out to analyze the broader architecture (e.g., how the Refinery state interacts with the Supabase client).
+   - Use **`/improve-codebase-architecture`**: Periodically analyze the component tree (e.g., `page.tsx`) to find deepening opportunities, guided by the domain language in `CONTEXT.md`.
+   - Use **`/zoom-out`**: If stuck on localized state management, zoom out to analyze the broader architecture.
 
 5. **Communication**
    - Use **`/caveman`**: To reduce token usage and drop filler, communicate with the user in ultra-compressed mode while retaining full technical accuracy.

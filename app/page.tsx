@@ -10,19 +10,13 @@ import { SolarSystem } from "@/src/components/canvas/SolarSystem";
 import { CameraController } from "@/src/components/canvas/CameraController";
 import { SolarBloom } from "@/src/components/canvas/SolarBloom";
 import { NodeDetailPanel } from "@/src/components/hud/NodeDetailPanel";
-import { ArchivePanel } from "@/src/components/hud/ArchivePanel";
 import { GalaxyTerminalHUD } from "@/src/components/hud/GalaxyTerminalHUD";
-import { SunConsole } from "@/src/components/hud/SunConsole";
-import { SaturnConsole } from "@/src/components/hud/SaturnConsole";
-import { MacroIntelConsole } from "@/src/components/hud/MacroIntelConsole";
-import { SocialSignalConsole } from "@/src/components/hud/SocialSignalConsole";
-import { SystemFrameConsole } from "@/src/components/hud/SystemFrameConsole";
 import { useDevRenderCounter } from "@/src/lib/dev-render-profiler";
 import {
   createCanvasRuntimeProfile,
   type CanvasRuntimeProfile,
 } from "@/src/modules/canvas/runtime-controller";
-import { useGalaxyShell } from "@/src/modules/galaxy-shell/useGalaxyShell";
+import { useSolarStore } from "@/src/store/solarStore";
 
 function WebGLWarning() {
   return (
@@ -38,11 +32,10 @@ function WebGLWarning() {
 interface SceneProps {
   hasFocusedPlanet: boolean;
   orbitTarget: [number, number, number];
-  onSunClick: () => void;
   runtime: CanvasRuntimeProfile;
 }
 
-const Scene = ({ hasFocusedPlanet, orbitTarget, onSunClick, runtime }: SceneProps) => {
+const Scene = ({ hasFocusedPlanet, orbitTarget, runtime }: SceneProps) => {
   useDevRenderCounter("Home::MemoizedScene");
   return (
     <Canvas
@@ -100,7 +93,7 @@ const Scene = ({ hasFocusedPlanet, orbitTarget, onSunClick, runtime }: SceneProp
       )}
 
       <CameraController />
-      <CoreStar onSunClick={onSunClick} />
+      <CoreStar />
       <SolarSystem />
       {runtime.bloomEnabled && <SolarBloom />}
     </Canvas>
@@ -111,7 +104,8 @@ export const MemoizedScene = memo(Scene);
 
 export default function Home() {
   useDevRenderCounter("Home::Root");
-  const shell = useGalaxyShell();
+  const focusedPlanet = useSolarStore((state) => state.focusedPlanet);
+  const setFocusedPlanet = useSolarStore((state) => state.setFocusedPlanet);
   const [webglLost, setWebglLost] = useState(false);
   const orbitTarget = useMemo<[number, number, number]>(() => [0, 0, 0], []);
   const deviceMemoryGb =
@@ -121,10 +115,10 @@ export default function Home() {
   const canvasRuntime = useMemo(
     () =>
       createCanvasRuntimeProfile({
-        overlayActive: shell.isOverlayActive,
+        overlayActive: false,
         deviceMemoryGb,
       }),
-    [deviceMemoryGb, shell.isOverlayActive]
+    [deviceMemoryGb]
   );
 
   const handleContextLost = useCallback((event: Event) => {
@@ -137,6 +131,17 @@ export default function Home() {
     console.log("WebGL context restored");
     setWebglLost(false);
   }, []);
+
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setFocusedPlanet(null);
+      }
+    };
+
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [setFocusedPlanet]);
 
   useEffect(() => {
     const canvas = document.querySelector("canvas");
@@ -154,65 +159,16 @@ export default function Home() {
   return (
     <main className="relative h-screen w-screen bg-black">
       {webglLost && <WebGLWarning />}
-      
+
       <GalaxyTerminalHUD />
 
       <MemoizedScene
-        hasFocusedPlanet={shell.focusedPlanet !== null}
+        hasFocusedPlanet={focusedPlanet !== null}
         orbitTarget={orbitTarget}
-        onSunClick={shell.commands.openSunConsole}
         runtime={canvasRuntime}
       />
 
-      {!shell.activeSystem && (
-        <NodeDetailPanel
-          onEnterAnalyticalPipeline={shell.commands.openAnalyticalPipeline}
-          onEnterArchive={shell.commands.openArchive}
-          onEnterKnowledgeGraph={shell.commands.openKnowledgeGraph}
-          onEnterExocortex={shell.commands.openExocortex}
-          onEnterMacroIntel={shell.commands.openMacroIntel}
-          onEnterSocialSignals={shell.commands.openSocialSignals}
-          onOpenSaturnRadar={shell.commands.openSaturnRadar}
-          isRAGOpen={shell.activeSystem === "exocortex"}
-        />
-      )}
-
-      {shell.activeSystem === "archive" && (
-        <ArchivePanel onClose={shell.commands.closeSystem} />
-      )}
-
-      <SunConsole
-        isOpen={shell.isSunConsoleOpen}
-        onClose={shell.commands.closeSunConsole}
-        onPlanetSelect={shell.commands.selectPlanetFromSunConsole}
-      />
-
-      <SaturnConsole
-        isOpen={shell.activeSystem === "saturn"}
-        onClose={shell.commands.closeSystem}
-      />
-
-      <MacroIntelConsole
-        isOpen={shell.activeSystem === "macro-intel"}
-        onClose={shell.commands.closeSystem}
-      />
-
-      <SocialSignalConsole
-        isOpen={shell.activeSystem === "social-signals"}
-        onClose={shell.commands.closeSystem}
-      />
-
-      {shell.systemFrame && (
-        <SystemFrameConsole
-          isOpen
-          onClose={shell.commands.closeSystem}
-          src={shell.systemFrame.src}
-          title={shell.systemFrame.title}
-          eyebrow={shell.systemFrame.eyebrow}
-          fullBleed={shell.systemFrame.fullBleed}
-          borderClassName={shell.systemFrame.borderClassName}
-        />
-      )}
+      <NodeDetailPanel />
     </main>
   );
 }

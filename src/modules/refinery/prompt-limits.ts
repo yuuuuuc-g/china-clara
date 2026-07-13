@@ -1,1 +1,0 @@
-export const MAX_REFINERY_PROMPT_CHARS = 4_000;
