@@ -1,18 +1,4 @@
-export type ModuleType =
-  | "archive"
-  | "analytical-pipeline"
-  | "knowledge-graph"
-  | "exocortex"
-  | "macro-intel"
-  | "social-signals";
-
-export type PlanetLabel =
-  | "Archive"
-  | "Analytical Pipeline"
-  | "Knowledge Graph"
-  | "Exocortex"
-  | "Intelligence Board"
-  | "Social Signals";
+import type { ModuleId } from "@/src/lib/modules";
 
 export interface PlanetConfig {
   name: string;
@@ -24,14 +10,15 @@ export interface PlanetConfig {
   hasRing?: boolean;
   ringInnerRadius?: number;
   ringOuterRadius?: number;
-  label?: PlanetLabel;
-  module?: ModuleType;
+  /** 本地化的悬停标签。 */
+  label?: string;
+  /** 关联的 China Clara 模块（点击行星进入该模块页）。 */
+  moduleId?: ModuleId;
+  /** 目标 SSR 页 slug，供详情面板拼出 /[locale]/<slug>。 */
+  slug?: string;
   textureUrl?: string;
   ringTextureUrl?: string;
   description?: string;
-  mass?: string;
-  gravity?: string;
-  type?: string;
   eccentricity?: number;
 }
 

@@ -9,14 +9,18 @@
   --font-geist-mono: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
 }
 
-/* 强制重置，防止 3D 画布出现滚动条 */
-html, body, #__next {
+/* 基础重置。注意：不在全局禁用滚动，否则 SSR 内容页无法滚动（双轨 UI 铁律 #4）。 */
+html, body {
   width: 100%;
-  height: 100%;
   margin: 0;
   padding: 0;
-  overflow: hidden; /* 宇宙没有边界，不需要滚动条 */
-  background-color: #000000; /* 默认深空黑 */
+  background-color: #000000; /* 默认深空黑，SSR 内容页由自身容器覆盖为浅色 */
+}
+
+/* 仅 3D 星系门户禁用滚动条（“宇宙没有边界”）。 */
+body:has(.portal-shell) {
+  overflow: hidden;
+  height: 100%;
 }
 
 .refinery-editor .ProseMirror h1,

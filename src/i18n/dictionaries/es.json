@@ -7,5 +7,19 @@
     "community": "Comunidad",
     "api": "API abierta"
   },
+  "modules": {
+    "understand": { "blurb": "Economía, política, sociedad, historia y cultura de China, explicadas en tu idioma." },
+    "intelligence": { "blurb": "Novedades de la manufactura china y del comercio China-América Latina, en informes automáticos." },
+    "suppliers": { "blurb": "Fábricas chinas verificadas: certificaciones, catálogos y contacto directo. Sin intermediarios." },
+    "inquiries": { "blurb": "Envía tu solicitud de cotización (RFQ) y negocia directo con el proveedor. El pago lo acuerdan ustedes." },
+    "community": { "blurb": "Publica y lee experiencias de compra y análisis de mercado de otros importadores." },
+    "developers": { "blurb": "Conecta tu blog, tienda o agente de IA a nuestra API abierta /api/v1." }
+  },
+  "ui": {
+    "enter": "Entrar",
+    "backToPortal": "Volver al portal 3D",
+    "language": "Idioma",
+    "comingSoon": "Módulo en construcción."
+  },
   "tagline": "China, clara. Tu primera parada para entender China y encontrar proveedores confiables."
 }

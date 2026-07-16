@@ -7,5 +7,19 @@
     "community": "Community",
     "api": "Open API"
   },
+  "modules": {
+    "understand": { "blurb": "China's economy, politics, society, history and culture, explained in your language." },
+    "intelligence": { "blurb": "Chinese manufacturing and China-Latin America trade updates, delivered as automated briefings." },
+    "suppliers": { "blurb": "Verified Chinese factories: certifications, catalogs and direct contact. No middlemen." },
+    "inquiries": { "blurb": "Send your request for quotation (RFQ) and negotiate directly with the supplier. You settle payment between yourselves." },
+    "community": { "blurb": "Publish and read sourcing experiences and market analysis from other importers." },
+    "developers": { "blurb": "Connect your blog, store or AI agent to our open /api/v1." }
+  },
+  "ui": {
+    "enter": "Enter",
+    "backToPortal": "Back to 3D portal",
+    "language": "Language",
+    "comingSoon": "Module under construction."
+  },
   "tagline": "China, clara. Your first stop to understand China and find trusted suppliers."
 }

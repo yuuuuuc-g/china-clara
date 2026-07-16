@@ -7,5 +7,19 @@
     "community": "社区",
     "api": "开放接口"
   },
+  "modules": {
+    "understand": { "blurb": "中国的宏观经济、政治、社会、历史与文化，用拉美读者的语言讲清楚。" },
+    "intelligence": { "blurb": "中国制造业与中拉贸易动态，自动生成日报与周报。" },
+    "suppliers": { "blurb": "经审核的中国工厂：资质、商品目录与直接联系方式。没有中间商。" },
+    "inquiries": { "blurb": "发起询盘（RFQ），与供应商直接沟通。支付由买卖双方自行商议。" },
+    "community": { "blurb": "发表并阅读其他进口商的采购经验与市场观察。" },
+    "developers": { "blurb": "把你的博客、电商站或 AI 代理接入开放接口 /api/v1。" }
+  },
+  "ui": {
+    "enter": "进入",
+    "backToPortal": "返回 3D 门户",
+    "language": "语言",
+    "comingSoon": "模块建设中。"
+  },
   "tagline": "China, clara. 让拉美读懂中国，让好工厂被看见。"
 }
