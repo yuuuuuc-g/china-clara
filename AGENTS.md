@@ -1,78 +1,55 @@
-# Exocortex & Cognitive Refinery Project Guidelines
+# China Clara — Agent Memory
 
-## 🛠 Project Stack
-- **Framework**: Next.js (App Router)
-- **3D Engine**: @react-three/fiber + @react-three/drei (Three.js)
-- **AI Core**: Vercel AI SDK (`streamText` only, standard markdown generation)
-- **Database**: Supabase (PostgreSQL)
-- **Editor & UI**: TipTap (Edit Mode), `react-markdown` (Read Mode), Tailwind CSS + Typography (`prose-invert`)
-- **Animations**: Framer Motion 3D / Framer Motion
-- **Type Safety**: Strict TypeScript (Matt Pocock Style)
+> China, clara. 拉美人理解中国、找到可信中国供应商的第一站。
+> 内容驱动的 B2B 信息与采购沟通平台。平台不介入支付，只做询盘（RFQ），没有订单系统。
+> 本仓库由 knowledge-galaxy 原地重建而来；旧版完整快照在分支 `legacy-knowledge-galaxy`。
 
-## 🏛 Architecture Patterns
-- **Canvas-First (3D)**: `page.tsx` should only contain the `<Canvas>` and HUD containers. Celestial bodies (Star, Planet, Belt) are strictly split into `src/components/canvas/`.
-- **Z-Index Strategy**: 
-  - `Z-Index 0`: Three.js Canvas
-  - `Z-Index 10`: HUD Overlays & Modals (e.g., Earth Portal UI)
-- **Cognitive Funnel (Refinery)**: State-machine driven workflow (`Phase A` -> `B` -> `C` -> `D`).
-- **Parser Robustness**: Strictly parse AI streaming text using Markdown list items (`- ` or `* `) via `split('\n')`. Do NOT use fragile Regex block matching.
-- **Read/Edit Decoupling**: Phase D must separate rendering into two distinct states:
-  - Read Mode: `<ReactMarkdown>` for beautiful, uneditable typography.
-  - Edit Mode: `TipTap` for immersive text modification.
+## 架构铁律
 
-## 🗄️ Database Standards (Supabase)
-- **Primary Keys**: Always use `uuid` (generated via `uuid_generate_v4()` in Supabase), never `int8`.
-- **Client Initialization**: Centralized in `src/lib/supabase.ts` using `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY`.
+1. **API-first**：主站前端也只是 `/api/v1` 的消费者。不得绕过网关层直接对外暴露 PostgREST。
+2. **四域 schema**：Postgres 单库（**新建 Supabase 项目**，不要连旧 knowledge-galaxy 项目），
+   schema 分域：`content`（文章+情报）、`catalog`（供应商+商品）、`crm`（用户+询盘+PAT）、`community`（用户文章）。
+   新表必须归入其中一个域。Dashboard → Settings → API 需暴露这四个 schema。
+3. **没有订单**：只有 `crm.inquiries` → `crm.inquiry_messages` → `crm.deal_outcomes`（选填回访）。不要创建 orders 表。
+4. **双轨 UI**：根路径 `/` 是 3D 星系门户（保留自旧项目，行星待重映射到新模块）；
+   `/es` `/en` `/zh` 是 SSR 内容页（SEO 生命线）。任何页面在无 3D 时必须完整可用。
+5. **三语**：`/es`（拉美买家，优先）、`/en`（国际买家）、`/zh`（中国供应商）。
+   内容表配 `*_translations`，AI 初翻 + `human_reviewed` 标记。
 
-## 🧩 TypeScript Standards (Matt Pocock Style)
-- **Ref Typing**: Explicit Three.js types for refs (e.g., `useRef<THREE.Group>(null!)`).
-- **Props Interfaces**: Use `interface` for component props; exhaustive typing over `any`.
-- **Zero-Assertion**: Avoid `as any`. Use type guards.
-- **Utility Types**: Leverage `ComponentPropsWithoutRef`.
+## API 约定
 
-## 🌌 Performance Strategy (8GB RAM Device Optimization)
-- **3D Instancing**: Use `Instances` or `Merged` for repetitive objects (asteroids, starfields).
-- **Asset Management**: Always use `useGLTF.preload` for 3D models.
-- **Frame Looping**: Use `useFrame` sparingly. Dispose of geometries/materials on unmount.
-- **State Cleanup**: Always clear `useCompletion` text states (`setCompletion("")`) when transitioning between Refinery phases to prevent memory leaks and UI ghosting.
+- 版本化：`/api/v1/...`，破坏性变更升 v2，v1 至少保留 12 个月。
+- 统一信封：`{ "data": ..., "meta": {...}, "error": null }`（见 `src/lib/api/response.ts`）。
+- 认证：终端用户 Supabase Auth JWT；外部项目 PAT（`Authorization: Bearer pat_...`），
+  scope 白名单见 `src/lib/api/auth.ts`。
+- OpenAPI spec 在 `openapi.yaml`，改接口必须同步改 spec。
+- 新代码用 `src/lib/supabase/service.ts`（四域 untyped client）；
+  旧 `src/lib/supabase/admin.ts` 绑定旧 database.types，仅供 legacy 模块过渡使用。
 
-## Agent skills
+## 数据库迁移流程
 
-### Issue tracker
+1. 迁移基线已重置为 China Clara 四域（0001–0005）。旧 knowledge-galaxy 迁移在 git 历史 / legacy 分支。
+2. 新增 `supabase/migrations/NNNN_描述.sql`（编号递增，永不修改已应用的迁移）。
+3. `supabase db push` 应用到**新** Supabase 项目 → `npm run supabase:types` 重新生成类型。
+4. 新表默认开 RLS，策略写在同一迁移文件。
 
-Issues are tracked in GitHub Issues for `yuuuuuc-g/knowledge-galaxy`. See `docs/agents/issue-tracker.md`.
+## Legacy 处置清单（原地重建过渡期）
 
-### Triage labels
+**保留并复用**：
+- `src/components/canvas/` + `src/modules/canvas/` — 3D 门户（待改造：行星 → 读懂中国/情报/供应商/询盘/社区/API）
+- `src/modules/intelligence/` + `config/intelligence-sources.json` + `app/api/cron/intelligence-ingest` — 情报管线（待改造：信息源换成中拉贸易源，落表到 content 域）
+- `src/modules/ai/provider-adapter.ts` — 改造为西/英翻译管线
+- `src/modules/rag/`、`src/modules/retrieval/` — 读懂中国站内问答
 
-Use the default five-state triage label vocabulary. See `docs/agents/triage-labels.md`.
+**待删除（确认无引用后分批清理，勿一次性删）**：
+- `src/modules/{archive,refinery,galaxy-shell,social-signals}` 及对应 HUD 组件
+- `app/{archive,exocortex,knowledge-graph,analytical-pipeline}` 页面
+- `app/api/{archive,chat,nodes,search,topics,macro-intel,macro-raw-articles,social-signals,apac-supply-chain,analytical-pipeline,cron/fetch-news,cron/x-signals-ingest}`
+- `ingest.py`、`rag-pipeline/`、`requirements.txt`、`__pycache__`（Python 侧按需保留）
+- `src/lib/database.types.ts` 在新项目 types 生成后整体替换
 
-### Domain docs
+## 质量门禁（提交前必须全绿）
 
-This is a single-context repo with `CONTEXT.md`, `docs/adr/`, and `docs/decisions/`. See `docs/agents/domain.md`.
-
-### GitNexus usage boundary
-
-GitNexus is project-local and should be invoked via `npx --no-install gitnexus`. Do not use GitNexus as a routine daily-development prerequisite. Only use it when building a large information map, taking over a fully unfamiliar legacy codebase, or doing macro-level architecture safety review.
-
-## 🤖 Agent Workflow (Orchestration & Engineering Skills)
-You MUST read and adhere to the skills installed in the `.agents` directory before executing code changes. This project strictly follows the **Matt Pocock "Real Engineering" SOP**:
-
-1. **Initial Setup (Mandatory)**
-   - Run `/setup-matt-pocock-skills` (if not already done) to scaffold per-repo config for issue tracking, vocabulary, and domain docs.
-
-2. **Planning & Alignment (Before Coding)**
-   - Do NOT start writing code immediately.
-   - Use **`/grill-with-docs`**: When tackling a complex task (e.g., Supabase integration or 3D interactions), interrogate the user to challenge the plan against the existing domain model. Update `CONTEXT.md` and ADRs inline.
-   - Use **`/to-prd`**: After grilling, synthesize the conversation into a PRD to solidify the architecture.
-
-3. **Implementation Strategy**
-   - Use **`/prototype`**: For unproven integrations (e.g., testing Supabase writes or novel 3D HUD toggles), build a throwaway prototype first to resolve state/logic uncertainties before merging into the main codebase.
-   - Use **`/tdd`**: When writing utility functions or core data transformations, adopt a red-green-refactor loop. Build vertical slices.
-
-4. **Debugging & Refactoring**
-   - Use **`/diagnose`**: If encountering React rendering loops or 3D canvas crashes, follow the strict diagnosis loop: reproduce → minimise → hypothesise → instrument → fix → regression-test.
-   - Use **`/improve-codebase-architecture`**: Periodically analyze the component tree (e.g., `page.tsx` and `Earth.tsx`) to find deepening opportunities, guided by the domain language in `CONTEXT.md`.
-   - Use **`/zoom-out`**: If stuck on localized state management, zoom out to analyze the broader architecture (e.g., how the Refinery state interacts with the Supabase client).
-
-5. **Communication**
-   - Use **`/caveman`**: To reduce token usage and drop filler, communicate with the user in ultra-compressed mode while retaining full technical accuracy.
+```bash
+npm test && npx tsc --noEmit && npm run lint && npm run build
+```

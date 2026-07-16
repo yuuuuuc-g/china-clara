@@ -1,0 +1,84 @@
+openapi: 3.1.0
+info:
+  title: China Clara API
+  version: "1.0.0"
+  description: |
+    China, clara. 对外统一接口：内容（读懂中国）、商品目录、询盘。
+    统一响应信封 { data, meta, error }。外部项目使用 PAT（Bearer pat_...）。
+servers:
+  - url: https://chinaclara.com/api/v1
+security: []
+paths:
+  /content/articles:
+    get:
+      summary: 文章列表（公开）
+      parameters:
+        - { name: lang, in: query, schema: { type: string, enum: [es, en, zh], default: es } }
+        - { name: topic, in: query, schema: { type: string } }
+        - { name: page, in: query, schema: { type: integer, minimum: 1, default: 1 } }
+        - { name: per_page, in: query, schema: { type: integer, maximum: 50, default: 20 } }
+      responses:
+        "200": { $ref: "#/components/responses/Envelope" }
+  /catalog/products:
+    get:
+      summary: 商品列表（公开）
+      parameters:
+        - { name: lang, in: query, schema: { type: string, enum: [es, en, zh], default: es } }
+        - { name: category, in: query, schema: { type: string } }
+        - { name: page, in: query, schema: { type: integer, minimum: 1, default: 1 } }
+      responses:
+        "200": { $ref: "#/components/responses/Envelope" }
+  /inquiries:
+    post:
+      summary: 发起询盘（scope inquiries:write）
+      security: [{ pat: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [product_id, quantity, message, buyer_profile_id]
+              properties:
+                product_id: { type: string, format: uuid }
+                quantity: { type: integer, minimum: 1 }
+                target_port: { type: string }
+                message: { type: string, minLength: 10 }
+                buyer_profile_id: { type: string, format: uuid }
+      responses:
+        "201": { $ref: "#/components/responses/Envelope" }
+        "401": { $ref: "#/components/responses/Envelope" }
+        "422": { $ref: "#/components/responses/Envelope" }
+components:
+  securitySchemes:
+    pat:
+      type: http
+      scheme: bearer
+      bearerFormat: "pat_..."
+  responses:
+    Envelope:
+      description: 统一信封
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              data: {}
+              meta: { type: object }
+              error:
+                type: [object, "null"]
+                properties:
+                  code: { type: string }
+                  message: { type: string }
+webhooks:
+  inquiry.created:
+    post:
+      summary: 新询盘事件（推送到 crm.webhook_endpoints 注册的回调）
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                event: { type: string, const: inquiry.created }
+                data: { type: object }
