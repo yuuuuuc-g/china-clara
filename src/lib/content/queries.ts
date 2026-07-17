@@ -88,7 +88,11 @@ export async function listPublishedArticles(opts: {
   if (opts.topic) query = query.eq("topics.slug", opts.topic);
 
   const { data, error, count } = await query;
-  if (error || !data) return { items: [], total: 0, page, perPage };
+  if (error) {
+    console.error("[content.queries] listPublishedArticles failed:", error.message);
+    return { items: [], total: 0, page, perPage };
+  }
+  if (!data) return { items: [], total: 0, page, perPage };
 
   const items = (data as unknown as RawArticleRow[])
     .map((row): ArticleListItem | null => {
@@ -123,7 +127,11 @@ export async function getPublishedArticle(opts: {
     .eq("article_translations.lang", opts.lang)
     .maybeSingle();
 
-  if (error || !data) return null;
+  if (error) {
+    console.error("[content.queries] getPublishedArticle failed:", error.message);
+    return null;
+  }
+  if (!data) return null;
 
   const row = data as unknown as RawArticleRow;
   const t = firstTranslation(row);
