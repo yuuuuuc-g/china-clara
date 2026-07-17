@@ -2,7 +2,7 @@
 
 > 本文档是「由 knowledge-galaxy 原地重建为 China Clara」全过程的权威记录。
 > 目的：任何人（包括未来的你和 AI 代理）打开这一篇，就能搞清项目是什么、做到哪了、下一步做什么。
-> 最后更新：2026-07-17。
+> 最后更新：2026-07-18。
 
 ---
 
@@ -160,3 +160,30 @@ npm test && npx tsc --noEmit && npm run lint && npm run build
 - `/es` `/en` `/zh` 三语落地页正常；
 - `/es/understand` 等显示「暂无文章」空状态；文章详情 404；
 - `/api/v1/content/articles` 返回 `{"data":[],"meta":{...total:0},"error":null}`。
+
+---
+
+## 9. 进展更新（2026-07-18）
+
+上面 7、8 节描述的是「main 还没合并、Supabase 还没建」的时点，现已全部推进。
+
+### Git 已理顺（不再有两条线）
+- 完整重建已成为 `main` 并强推 origin（`git push --force-with-lease`）。
+- 旧「只剩 UI 外壳」(PR #11) 保留在 `claude/frontend-ui-only`；旧 KG 完整快照在 `legacy-knowledge-galaxy`（均在 origin）。
+- 项目文件夹由 `knowledge-galaxy` 改名为 `china-clara`；GitHub 仓库同名，remote 已是 `china-clara.git`。
+- 清理了嵌套在 `.claude/worktrees/` 里的 git worktree（否则 vitest/eslint/tsc 会递归扫进去导致误报）。
+
+### Supabase 已上线，内容纵切跑真实数据
+- 新项目 `ozqkirgebujkcvdezjet`（us-east-1）：已 link、迁移 **0001-0006** 全应用、四 schema 已在 Data API 设置里暴露、样例数据已灌（`supabase/seed.sql`）。
+- 读懂中国 `/es|/en|/zh/understand` 列表 + 详情已渲染真实三语内容、markdown 正文、本地化日期、以及 `human_reviewed=false` 时的「AI 初翻待校订」提示。
+
+### 本轮踩的坑与固化的解
+- **自定义 schema 授权**：0005 只开了 RLS 没授表权限，连 service_role 都报 `permission denied for schema content`（42501）。补 `0006_grants.sql`：给四域授 anon/authenticated/service_role 权限，RLS 仍管行级。
+- **直连库 IPv6-only**：`db.<ref>.supabase.co:5432` 直连 `tls error (EOF)`。改用 session pooler：`--db-url "postgresql://postgres.<ref>:<pwd>@aws-0-us-east-1.pooler.supabase.com:5432/postgres"`。
+- **新版 API key 格式**：项目用 `sb_publishable_/sb_secret_`；代码兼容旧版 `service_role` JWT，`.env.local` 用后者最稳。
+- **查询层吞错**：`src/lib/content/queries.ts` 原本把 DB 错误当空状态返回，掩盖了授权问题；已改为 `console.error` 暴露真实错误。
+
+### 待办（下一步）
+- **全站 Basic Auth 中间件 `proxy.ts`**（`SITE_PASSWORD`）仍拦住公开内容与 API——建设期保留，**上线前必须放开公开内容与只读 API**（写接口有 PAT 自保护）。
+- **`.env.local` 旧项目残留**：`SUPABASE_URL`/`SUPABASE_KEY` 仍指向旧项目 `bhfqzjnhsdietkzjejvu`；`getSupabaseAdminEnv()` 里 `SUPABASE_URL` 优先级高于 `NEXT_PUBLIC_SUPABASE_URL`，会让保留的 `admin.ts`（intelligence 路由用）连错项目。删这两行或改成新项目值。
+- 下一个内容纵切：供应商目录 `/suppliers`（消费 catalog 域）。
