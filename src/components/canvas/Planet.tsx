@@ -97,10 +97,15 @@ export function Planet({ config }: PlanetProps) {
 
   });
 
+  // 只有承载模块的行星可点击聚焦；装饰行星（水星、土星）纯观赏，
+  // 否则点击后相机聚焦却没有详情面板可关闭，OrbitControls 会被锁死。
+  const isInteractive = Boolean(config.moduleId);
+
   const handleClick = useCallback((e: { stopPropagation: () => void }) => {
     e.stopPropagation();
+    if (!isInteractive) return;
     setFocusedPlanet(config);
-  }, [config, setFocusedPlanet]);
+  }, [config, isInteractive, setFocusedPlanet]);
 
   return (
     <group>
@@ -109,16 +114,17 @@ export function Planet({ config }: PlanetProps) {
       <group ref={groupRef} name={config.name}>
         <Sphere
           ref={planetRef}
-          args={[size, 32, 32]} 
-          onPointerOver={(e) => { 
-            e.stopPropagation(); 
-            setHovered(true); 
-            document.body.style.cursor = "pointer"; 
+          args={[size, 32, 32]}
+          onPointerOver={(e) => {
+            e.stopPropagation();
+            if (!isInteractive) return;
+            setHovered(true);
+            document.body.style.cursor = "pointer";
           }}
-          onPointerOut={(e) => { 
-            e.stopPropagation(); 
-            setHovered(false); 
-            document.body.style.cursor = "auto"; 
+          onPointerOut={(e) => {
+            e.stopPropagation();
+            setHovered(false);
+            document.body.style.cursor = "auto";
           }}
           onClick={handleClick}
           scale={hovered ? 1.05 : 1}

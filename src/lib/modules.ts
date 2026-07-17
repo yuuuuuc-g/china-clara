@@ -47,14 +47,18 @@ export interface ModuleDef {
 }
 
 export const MODULES: readonly ModuleDef[] = [
+  // 数组顺序 = 产品优先级（导航/网格渲染顺序），内容先行：读懂中国第一。
+  // 行星视觉按真实太阳系排布（SolarSystem 按 orbitRadius 排序渲染，与此处顺序无关）。
+  // 模块 → 行星映射：金星=询盘、地球=读懂中国、火星=情报、木星=供应商、
+  // 天王星=社区、海王星=开放接口；水星、土星、月球为无模块装饰天体（见 SolarSystem）。
   {
     id: "understand",
     slug: "understand",
     navKey: "understand",
     planet: {
-      name: "understand",
-      size: 0.8,
-      orbitRadius: 7,
+      name: "Earth",
+      size: 0.75,
+      orbitRadius: 8,
       orbitSpeed: 0.5,
       rotationSpeed: 1.0,
       color: "#4f86f7",
@@ -66,10 +70,10 @@ export const MODULES: readonly ModuleDef[] = [
     slug: "intelligence",
     navKey: "intel",
     planet: {
-      name: "intelligence",
-      size: 0.55,
-      orbitRadius: 9.5,
-      orbitSpeed: 0.42,
+      name: "Mars",
+      size: 0.5,
+      orbitRadius: 10,
+      orbitSpeed: 0.4,
       rotationSpeed: 0.9,
       color: "#c1440e",
       textureUrl: "/textures/2k_mars.jpg",
@@ -80,11 +84,11 @@ export const MODULES: readonly ModuleDef[] = [
     slug: "suppliers",
     navKey: "suppliers",
     planet: {
-      name: "suppliers",
-      size: 1.6,
-      orbitRadius: 13,
-      orbitSpeed: 0.24,
-      rotationSpeed: 1.8,
+      name: "Jupiter",
+      size: 1.8,
+      orbitRadius: 14,
+      orbitSpeed: 0.2,
+      rotationSpeed: 2.0,
       color: "#d4a373",
       textureUrl: "/textures/2k_jupiter.jpg",
     },
@@ -94,11 +98,11 @@ export const MODULES: readonly ModuleDef[] = [
     slug: "inquiries",
     navKey: "inquiries",
     planet: {
-      name: "inquiries",
+      name: "Venus",
       size: 0.7,
-      orbitRadius: 16,
-      orbitSpeed: 0.18,
-      rotationSpeed: 0.6,
+      orbitRadius: 6,
+      orbitSpeed: 0.6,
+      rotationSpeed: 0.3,
       color: "#e6c288",
       textureUrl: "/textures/2k_venus_atmosphere.jpg",
     },
@@ -108,10 +112,10 @@ export const MODULES: readonly ModuleDef[] = [
     slug: "community",
     navKey: "community",
     planet: {
-      name: "community",
+      name: "Uranus",
       size: 1.0,
-      orbitRadius: 19,
-      orbitSpeed: 0.13,
+      orbitRadius: 22,
+      orbitSpeed: 0.1,
       rotationSpeed: 1.2,
       color: "#a7d6d6",
       textureUrl: "/textures/2k_uranus.jpg",
@@ -122,10 +126,10 @@ export const MODULES: readonly ModuleDef[] = [
     slug: "developers",
     navKey: "api",
     planet: {
-      name: "developers",
+      name: "Neptune",
       size: 0.95,
-      orbitRadius: 22.5,
-      orbitSpeed: 0.09,
+      orbitRadius: 26,
+      orbitSpeed: 0.08,
       rotationSpeed: 1.1,
       color: "#4b70dd",
       textureUrl: "/textures/2k_neptune.jpg",
