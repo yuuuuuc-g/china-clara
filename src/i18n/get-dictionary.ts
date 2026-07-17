@@ -23,6 +23,19 @@ export interface Dictionary {
     /** AI 初翻、尚未人工校订的提示（信任透明）。 */
     aiDraftNotice: string;
   };
+  catalog: {
+    suppliersEmpty: string;
+    backToSuppliers: string;
+    verified: string;
+    products: string;
+    noProducts: string;
+    moq: string;
+    priceOnRequest: string;
+    website: string;
+    location: string;
+    founded: string;
+    employees: string;
+  };
   tagline: string;
 }
 

@@ -26,5 +26,18 @@
     "backToList": "返回文章列表",
     "aiDraftNotice": "AI 初翻，尚未经人工校订。"
   },
+  "catalog": {
+    "suppliersEmpty": "还没有已审核的供应商，敬请期待。",
+    "backToSuppliers": "返回供应商列表",
+    "verified": "已审核",
+    "products": "商品",
+    "noProducts": "该供应商还没有发布商品。",
+    "moq": "起订量",
+    "priceOnRequest": "价格面议",
+    "website": "官网",
+    "location": "所在地",
+    "founded": "成立年份",
+    "employees": "员工规模"
+  },
   "tagline": "China, clara. 让拉美读懂中国，让好工厂被看见。"
 }

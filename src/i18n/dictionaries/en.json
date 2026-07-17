@@ -26,5 +26,18 @@
     "backToList": "Back to articles",
     "aiDraftNotice": "Initial AI translation, pending human review."
   },
+  "catalog": {
+    "suppliersEmpty": "No verified suppliers yet. Check back soon.",
+    "backToSuppliers": "Back to suppliers",
+    "verified": "Verified",
+    "products": "Products",
+    "noProducts": "This supplier hasn't published any products yet.",
+    "moq": "MOQ",
+    "priceOnRequest": "Price on request",
+    "website": "Website",
+    "location": "Location",
+    "founded": "Founded",
+    "employees": "Employees"
+  },
   "tagline": "China, clara. Your first stop to understand China and find trusted suppliers."
 }

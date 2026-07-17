@@ -26,5 +26,18 @@
     "backToList": "Volver a los artículos",
     "aiDraftNotice": "Traducción inicial con IA, pendiente de revisión humana."
   },
+  "catalog": {
+    "suppliersEmpty": "Aún no hay proveedores verificados. Vuelve pronto.",
+    "backToSuppliers": "Volver a los proveedores",
+    "verified": "Verificado",
+    "products": "Productos",
+    "noProducts": "Este proveedor aún no publicó productos.",
+    "moq": "Pedido mínimo",
+    "priceOnRequest": "Precio a consultar",
+    "website": "Sitio web",
+    "location": "Ubicación",
+    "founded": "Fundada en",
+    "employees": "Empleados"
+  },
   "tagline": "China, clara. Tu primera parada para entender China y encontrar proveedores confiables."
 }

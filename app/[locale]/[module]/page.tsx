@@ -12,7 +12,7 @@ import { MODULES } from "@/src/lib/modules";
  * 静态段接管，这里从 generateStaticParams 排除，避免重复预渲染冲突。
  */
 
-const DEDICATED_SLUGS = new Set(["understand"]);
+const DEDICATED_SLUGS = new Set(["understand", "suppliers"]);
 const GENERIC_MODULES = MODULES.filter((mod) => !DEDICATED_SLUGS.has(mod.slug));
 
 export function generateStaticParams() {
