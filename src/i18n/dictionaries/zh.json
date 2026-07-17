@@ -21,5 +21,10 @@
     "language": "语言",
     "comingSoon": "模块建设中。"
   },
+  "content": {
+    "articlesEmpty": "还没有已发布的文章，敬请期待。",
+    "backToList": "返回文章列表",
+    "aiDraftNotice": "AI 初翻，尚未经人工校订。"
+  },
   "tagline": "China, clara. 让拉美读懂中国，让好工厂被看见。"
 }

@@ -15,6 +15,14 @@ export interface Dictionary {
     /** 该模块尚在建设中。 */
     comingSoon: string;
   };
+  content: {
+    /** 读懂中国列表暂无文章时的空状态。 */
+    articlesEmpty: string;
+    /** 文章详情页返回列表。 */
+    backToList: string;
+    /** AI 初翻、尚未人工校订的提示（信任透明）。 */
+    aiDraftNotice: string;
+  };
   tagline: string;
 }
 

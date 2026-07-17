@@ -8,10 +8,15 @@ import { MODULES } from "@/src/lib/modules";
 /**
  * 六大模块的通用 SSR 落地页（占位，待各模块建成真实页面后逐一替换）。
  * 现阶段保证门户/导航链接全部可达且三语可读（双轨 UI 铁律 #4）。
+ * 注意：已有专属路由的模块（如 understand → /[locale]/understand）由更具体的
+ * 静态段接管，这里从 generateStaticParams 排除，避免重复预渲染冲突。
  */
 
+const DEDICATED_SLUGS = new Set(["understand"]);
+const GENERIC_MODULES = MODULES.filter((mod) => !DEDICATED_SLUGS.has(mod.slug));
+
 export function generateStaticParams() {
-  return locales.flatMap((locale) => MODULES.map((mod) => ({ locale, module: mod.slug })));
+  return locales.flatMap((locale) => GENERIC_MODULES.map((mod) => ({ locale, module: mod.slug })));
 }
 
 export async function generateMetadata({

@@ -21,5 +21,10 @@
     "language": "Idioma",
     "comingSoon": "Módulo en construcción."
   },
+  "content": {
+    "articlesEmpty": "Aún no hay artículos publicados. Vuelve pronto.",
+    "backToList": "Volver a los artículos",
+    "aiDraftNotice": "Traducción inicial con IA, pendiente de revisión humana."
+  },
   "tagline": "China, clara. Tu primera parada para entender China y encontrar proveedores confiables."
 }

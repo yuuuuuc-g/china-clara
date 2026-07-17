@@ -21,5 +21,10 @@
     "language": "Language",
     "comingSoon": "Module under construction."
   },
+  "content": {
+    "articlesEmpty": "No articles published yet. Check back soon.",
+    "backToList": "Back to articles",
+    "aiDraftNotice": "Initial AI translation, pending human review."
+  },
   "tagline": "China, clara. Your first stop to understand China and find trusted suppliers."
 }
