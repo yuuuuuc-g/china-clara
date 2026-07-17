@@ -5,8 +5,6 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
-    "fetch:apac-supply-chain": "node scripts/fetch-apac-supply-chain.mjs",
-    "fetch:macro-intel": "node scripts/fetch-macro-intel.mjs",
     "supabase:types": "node scripts/generate-supabase-types.mjs",
     "supabase:types:local": "node scripts/generate-supabase-types.mjs --local",
     "start": "next start",
