@@ -67,3 +67,75 @@ cross join (values
 ) as v(lang, title, summary, body_md, human_reviewed)
 where a.slug = 'zonas-economicas-especiales'
 on conflict (article_id, lang) do nothing;
+
+-- ============================================================
+-- catalog 域：供应商目录样例
+-- ============================================================
+
+insert into catalog.categories (slug, hs_prefix, name_zh, name_es, name_en) values
+  ('lighting', '9405', '照明', 'Iluminación', 'Lighting'),
+  ('textiles', '6305', '纺织品', 'Textiles', 'Textiles')
+on conflict (slug) do nothing;
+
+-- 供应商 1：深圳朗明电子（pro，已审核）
+insert into catalog.suppliers (slug, company_name, company_name_en, province, city, founded_year, employees_range, website, verification_status, membership_tier)
+values ('shenzhen-lumina-electronics', '深圳市朗明电子有限公司', 'Shenzhen Lumina Electronics Co., Ltd.', '广东', '深圳', 2013, '50-200', 'https://example.com/lumina', 'verified', 'pro')
+on conflict (slug) do nothing;
+
+-- 供应商 2：义乌索拉纺织（free，已审核）
+insert into catalog.suppliers (slug, company_name, company_name_en, province, city, founded_year, employees_range, verification_status, membership_tier)
+values ('yiwu-solaris-textile', '义乌市索拉纺织品有限公司', 'Yiwu Solaris Textile Co., Ltd.', '浙江', '义乌', 2016, '10-50', 'verified', 'free')
+on conflict (slug) do nothing;
+
+-- 一个待审核供应商（不应出现在公开列表，用于验证过滤）
+insert into catalog.suppliers (slug, company_name, verification_status, membership_tier)
+values ('pending-co', '待审核样例公司', 'pending', 'free')
+on conflict (slug) do nothing;
+
+-- 资质
+insert into catalog.supplier_certifications (supplier_id, kind, file_url, verified)
+select s.id, v.kind, v.file_url, v.verified
+from catalog.suppliers s
+cross join (values
+  ('business_license', 'https://example.com/cert/bl.pdf', true),
+  ('iso9001', 'https://example.com/cert/iso.pdf', true)
+) as v(kind, file_url, verified)
+where s.slug = 'shenzhen-lumina-electronics'
+  and not exists (select 1 from catalog.supplier_certifications c where c.supplier_id = s.id and c.kind = v.kind);
+
+-- 商品 + 三语文案
+insert into catalog.products (slug, supplier_id, category_id, status, moq, price_min_usd, price_max_usd, origin_city)
+select 'lumina-led-panel-40w',
+       (select id from catalog.suppliers where slug = 'shenzhen-lumina-electronics'),
+       (select id from catalog.categories where slug = 'lighting'),
+       'published', 500, 8.00, 15.00, '深圳'
+on conflict (slug) do nothing;
+
+insert into catalog.products (slug, supplier_id, category_id, status, moq, price_min_usd, price_max_usd, origin_city)
+select 'solaris-cotton-tote',
+       (select id from catalog.suppliers where slug = 'yiwu-solaris-textile'),
+       (select id from catalog.categories where slug = 'textiles'),
+       'published', 2000, 0.80, 1.50, '义乌'
+on conflict (slug) do nothing;
+
+insert into catalog.product_translations (product_id, lang, name, description, human_reviewed)
+select p.id, v.lang, v.name, v.description, v.human_reviewed
+from catalog.products p
+cross join (values
+  ('zh', '40W LED 面板灯', '3000K-6500K 可选，CRI>80，适用于商业照明。', true),
+  ('es', 'Panel LED 40W', '3000K-6500K, CRI>80, para iluminación comercial.', false),
+  ('en', '40W LED Panel Light', '3000K-6500K, CRI>80, for commercial lighting.', false)
+) as v(lang, name, description, human_reviewed)
+where p.slug = 'lumina-led-panel-40w'
+on conflict (product_id, lang) do nothing;
+
+insert into catalog.product_translations (product_id, lang, name, description, human_reviewed)
+select p.id, v.lang, v.name, v.description, v.human_reviewed
+from catalog.products p
+cross join (values
+  ('zh', '全棉手提袋', '180g/m² 帆布，可定制印刷。', true),
+  ('es', 'Bolsa de algodón', 'Lona de 180 g/m², impresión personalizable.', false),
+  ('en', 'Cotton Tote Bag', '180 gsm canvas, custom printing available.', false)
+) as v(lang, name, description, human_reviewed)
+where p.slug = 'solaris-cotton-tote'
+on conflict (product_id, lang) do nothing;
