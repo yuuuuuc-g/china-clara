@@ -57,7 +57,7 @@ npm test && npx tsc --noEmit && npm run lint && npm run build
 <!-- gitnexus:start -->
 # GitNexus — Code Intelligence
 
-This project is indexed by GitNexus as **china-clara** (1263 symbols, 2060 relationships, 73 execution flows). Use the GitNexus MCP tools to understand code, assess impact, and navigate safely.
+This project is indexed by GitNexus as **china-clara** (1431 symbols, 2389 relationships, 101 execution flows). Use the GitNexus MCP tools to understand code, assess impact, and navigate safely.
 
 > If any GitNexus tool warns the index is stale, run `npx gitnexus analyze` in terminal first.
 
