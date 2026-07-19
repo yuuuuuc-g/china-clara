@@ -55,6 +55,9 @@
   },
   "crm": {
     "myInquiries": "My inquiries",
+    "received": "Received inquiries",
+    "sent": "Sent inquiries",
+    "emptyReceived": "You haven't received any buyer inquiries yet.",
     "empty": "You haven't sent any inquiries yet. Find a supplier and request your first quote.",
     "browseSuppliers": "Browse suppliers",
     "newInquiry": "New inquiry",

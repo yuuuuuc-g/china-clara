@@ -55,6 +55,9 @@
   },
   "crm": {
     "myInquiries": "我的询盘",
+    "received": "收到的询盘",
+    "sent": "发出的询盘",
+    "emptyReceived": "还没有收到买家询盘。",
     "empty": "你还没有发起过询盘。去找一家供应商，发出第一份询价吧。",
     "browseSuppliers": "浏览供应商",
     "newInquiry": "发起询盘",

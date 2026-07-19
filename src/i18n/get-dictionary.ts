@@ -55,6 +55,10 @@ export interface Dictionary {
   };
   crm: {
     myInquiries: string;
+    /** 供应商收件箱分栏标题。 */
+    received: string;
+    sent: string;
+    emptyReceived: string;
     empty: string;
     browseSuppliers: string;
     newInquiry: string;

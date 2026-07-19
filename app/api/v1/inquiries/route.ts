@@ -2,7 +2,11 @@ import type { NextRequest } from "next/server";
 import { z } from "zod";
 import { ok, fail } from "@/src/lib/api/response";
 import { authenticatePat } from "@/src/lib/api/auth";
-import { createInquiry, listInquiriesForBuyer } from "@/src/lib/crm/inquiries";
+import {
+  createInquiry,
+  listInquiriesForBuyer,
+  listInquiriesForSupplier,
+} from "@/src/lib/crm/inquiries";
 import { isLocale, defaultLocale, type Locale } from "@/src/i18n/config";
 
 /**
@@ -32,12 +36,21 @@ export async function GET(req: NextRequest) {
 
   const page = Number(req.nextUrl.searchParams.get("page") ?? "1") || 1;
   const perPage = Number(req.nextUrl.searchParams.get("per_page") ?? "20") || 20;
-  const { items, total, ...rest } = await listInquiriesForBuyer({
-    buyerProfileId: auth.ownerProfileId,
-    lang: langFrom(req),
-    page,
-    perPage,
-  });
+  // role=supplier：列出发往我名下供应商的询盘（收件箱）；默认买家视角
+  const asSupplier = req.nextUrl.searchParams.get("role") === "supplier";
+  const { items, total, ...rest } = asSupplier
+    ? await listInquiriesForSupplier({
+        supplierOwnerProfileId: auth.ownerProfileId,
+        lang: langFrom(req),
+        page,
+        perPage,
+      })
+    : await listInquiriesForBuyer({
+        buyerProfileId: auth.ownerProfileId,
+        lang: langFrom(req),
+        page,
+        perPage,
+      });
   return ok(items, { total, ...rest });
 }
 

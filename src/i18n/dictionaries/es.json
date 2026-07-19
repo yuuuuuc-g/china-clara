@@ -55,6 +55,9 @@
   },
   "crm": {
     "myInquiries": "Mis consultas",
+    "received": "Consultas recibidas",
+    "sent": "Consultas enviadas",
+    "emptyReceived": "Aún no has recibido consultas de compradores.",
     "empty": "Aún no has enviado ninguna consulta. Encuentra un proveedor y pide tu primera cotización.",
     "browseSuppliers": "Explorar proveedores",
     "newInquiry": "Nueva consulta",

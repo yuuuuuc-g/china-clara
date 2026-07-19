@@ -73,9 +73,10 @@ paths:
         "404": { $ref: "#/components/responses/Envelope" }
   /inquiries:
     get:
-      summary: 我的询盘列表（scope inquiries:read；身份 = PAT 所有者）
+      summary: 我的询盘列表（scope inquiries:read；身份 = PAT 所有者；role=supplier 时为名下供应商收件箱）
       security: [{ pat: [] }]
       parameters:
+        - { name: role, in: query, schema: { type: string, enum: [buyer, supplier], default: buyer } }
         - { name: lang, in: query, schema: { type: string, enum: [es, en, zh], default: es } }
         - { name: page, in: query, schema: { type: integer, minimum: 1, default: 1 } }
         - { name: per_page, in: query, schema: { type: integer, maximum: 50, default: 20 } }

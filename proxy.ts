@@ -1,5 +1,33 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
+import { createServerClient } from '@supabase/ssr';
+
+/**
+ * Supabase 会话续期：access token（1 小时）过期后，用 refresh token 换新并写回
+ * cookie，避免登录用户闲置一小时后 SSR 页面把人当未登录（询盘中心/社区发帖都依赖）。
+ * 无 sb- cookie 的匿名流量直接放行，不产生 Auth 服务请求。
+ */
+async function withRefreshedSession(req: NextRequest): Promise<NextResponse> {
+  let res = NextResponse.next({ request: req });
+  const url = process.env['NEXT_PUBLIC_SUPABASE_URL'];
+  const key = process.env['NEXT_PUBLIC_SUPABASE_ANON_KEY'];
+  if (!url || !key) return res;
+  if (!req.cookies.getAll().some((c) => c.name.startsWith('sb-'))) return res;
+
+  const supabase = createServerClient(url, key, {
+    cookies: {
+      getAll: () => req.cookies.getAll(),
+      setAll: (cookiesToSet) => {
+        cookiesToSet.forEach(({ name, value }) => req.cookies.set(name, value));
+        res = NextResponse.next({ request: req });
+        cookiesToSet.forEach(({ name, value, options }) => res.cookies.set(name, value, options));
+      },
+    },
+  });
+  // getUser() 内部完成过期检测与 refresh；结果本身在这里不重要
+  await supabase.auth.getUser();
+  return res;
+}
 
 /**
  * Constant-time string comparison, safe for the Edge runtime.
@@ -33,7 +61,7 @@ export async function proxy(req: NextRequest) {
   if (!expectedPassword) {
     if (process.env.NODE_ENV !== 'production') {
       console.warn("⚠️ [Auth Proxy]: SITE_PASSWORD is not set. Bypassing authentication in development.");
-      return NextResponse.next();
+      return withRefreshedSession(req);
     }
 
     console.error("🚨 [Auth Proxy]: SITE_PASSWORD is not set in production. Blocking request.");
@@ -51,7 +79,7 @@ export async function proxy(req: NextRequest) {
         const pwd = decodedValue.substring(separatorIndex + 1);
 
         if (user === 'admin' && (await timingSafeEqual(pwd, expectedPassword))) {
-          return NextResponse.next();
+          return withRefreshedSession(req);
         }
       }
     } catch {
