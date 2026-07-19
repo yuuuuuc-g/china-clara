@@ -8,6 +8,7 @@ import { getInquiryForParty } from "@/src/lib/crm/inquiries";
 import { formatDateTime } from "@/src/lib/format";
 import { InquiryStatusBadge } from "@/src/components/site/InquiryStatusBadge";
 import { addMessageAction } from "../actions";
+import { MessageTranslation } from "./MessageTranslation";
 
 /** 询盘消息线程（SSR，仅当事双方可见）。 */
 export const dynamic = "force-dynamic";
@@ -102,6 +103,20 @@ export default async function InquiryThreadPage({
                 }`}
               >
                 <p className="whitespace-pre-wrap break-words">{msg.body}</p>
+                {!mine && (
+                  <MessageTranslation
+                    messageId={msg.id}
+                    locale={locale}
+                    initialText={msg.translatedLang === locale ? msg.bodyTranslated : null}
+                    labels={{
+                      translate: dict.crm.translate,
+                      hideTranslation: dict.crm.hideTranslation,
+                      translating: dict.crm.translating,
+                      translationFailed: dict.crm.translationFailed,
+                      machineTranslated: dict.crm.machineTranslated,
+                    }}
+                  />
+                )}
                 <p className={`mt-1.5 text-[11px] ${mine ? "opacity-60" : "text-neutral-500"}`}>
                   {mine
                     ? dict.crm.you

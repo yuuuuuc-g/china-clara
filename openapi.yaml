@@ -79,6 +79,28 @@ paths:
         "200": { $ref: "#/components/responses/Envelope" }
         "401": { $ref: "#/components/responses/Envelope" }
         "404": { $ref: "#/components/responses/Envelope" }
+  /inquiries/{id}/messages/{messageId}/translate:
+    post:
+      summary: 消息一键翻译（scope inquiries:read；仅当事双方；译文缓存在消息上）
+      security: [{ pat: [] }]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+        - { name: messageId, in: path, required: true, schema: { type: string, format: uuid } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [target_lang]
+              properties:
+                target_lang: { type: string, enum: [es, en, zh] }
+      responses:
+        "200": { $ref: "#/components/responses/Envelope" }
+        "401": { $ref: "#/components/responses/Envelope" }
+        "404": { $ref: "#/components/responses/Envelope" }
+        "422": { $ref: "#/components/responses/Envelope" }
+        "503": { $ref: "#/components/responses/Envelope" }
   /inquiries/{id}/messages:
     post:
       summary: 在询盘下发消息（scope inquiries:write；发送者 = PAT 所有者）

@@ -45,6 +45,9 @@ export interface InquiryMessage {
   id: string;
   senderProfileId: string;
   body: string;
+  /** AI 互译缓存（crm.inquiry_messages.body_translated），一次只缓存一种目标语言。 */
+  bodyTranslated: string | null;
+  translatedLang: string | null;
   createdAt: string;
 }
 
@@ -208,7 +211,7 @@ export async function getInquiryForParty(opts: {
   const { data: messageRows, error: messagesError } = await client
     .schema("crm")
     .from("inquiry_messages")
-    .select("id, sender_profile_id, body, created_at")
+    .select("id, sender_profile_id, body, body_translated, translated_lang, created_at")
     .eq("inquiry_id", inquiry.id)
     .order("created_at", { ascending: true });
 
@@ -230,11 +233,15 @@ export async function getInquiryForParty(opts: {
       id: string;
       sender_profile_id: string;
       body: string;
+      body_translated: string | null;
+      translated_lang: string | null;
       created_at: string;
     }>).map((m) => ({
       id: m.id,
       senderProfileId: m.sender_profile_id,
       body: m.body,
+      bodyTranslated: m.body_translated,
+      translatedLang: m.translated_lang,
       createdAt: m.created_at,
     })),
   };

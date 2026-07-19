@@ -74,6 +74,13 @@ export interface Dictionary {
     /** 消息线程里标记自己发言。 */
     you: string;
     productUnavailable: string;
+    /** 消息一键翻译（对方消息气泡下方）。 */
+    translate: string;
+    hideTranslation: string;
+    translating: string;
+    translationFailed: string;
+    /** 译文旁的「机器翻译」标记（信任透明）。 */
+    machineTranslated: string;
     /** 铁律 #3 的用户侧表达：平台不介入支付。 */
     noPayments: string;
     status: Record<InquiryStatus, string>;

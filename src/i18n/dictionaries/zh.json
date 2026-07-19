@@ -71,6 +71,11 @@
     "backToInquiries": "返回我的询盘",
     "you": "我",
     "productUnavailable": "商品已下架",
+    "translate": "翻译",
+    "hideTranslation": "收起译文",
+    "translating": "翻译中…",
+    "translationFailed": "翻译失败，请重试。",
+    "machineTranslated": "AI 翻译",
     "noPayments": "China Clara 不介入支付：交易细节由你与供应商直接商定。",
     "status": {
       "open": "待回复",

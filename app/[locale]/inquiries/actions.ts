@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { z } from "zod";
 import { getSessionProfile } from "@/src/lib/auth/session";
 import { addInquiryMessage, createInquiry } from "@/src/lib/crm/inquiries";
+import { translateInquiryMessage } from "@/src/lib/crm/translate";
 import { isLocale } from "@/src/i18n/config";
 
 /**
@@ -91,4 +92,30 @@ export async function addMessageAction(formData: FormData): Promise<void> {
 
   revalidatePath(threadPath);
   redirect(threadPath);
+}
+
+/**
+ * 消息一键翻译。由线程页的客户端组件直接调用（非表单提交），
+ * 返回译文而不重定向；译文缓存由 translateInquiryMessage 落库。
+ */
+export async function translateMessageAction(
+  messageId: string,
+  locale: string
+): Promise<{ ok: boolean; text?: string }> {
+  if (!isLocale(locale) || !z.string().uuid().safeParse(messageId).success) {
+    return { ok: false };
+  }
+  const session = await getSessionProfile();
+  if (!session) return { ok: false };
+
+  const result = await translateInquiryMessage({
+    messageId,
+    viewerProfileId: session.userId,
+    targetLang: locale,
+  });
+  if (!result.ok) {
+    console.error("[inquiries.actions] translate failed:", result.code, result.message);
+    return { ok: false };
+  }
+  return { ok: true, text: result.text };
 }

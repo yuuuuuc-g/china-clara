@@ -71,6 +71,11 @@
     "backToInquiries": "Back to my inquiries",
     "you": "You",
     "productUnavailable": "Product unavailable",
+    "translate": "Translate",
+    "hideTranslation": "Hide translation",
+    "translating": "Translating…",
+    "translationFailed": "Translation failed. Please try again.",
+    "machineTranslated": "Machine translation",
     "noPayments": "China Clara does not process payments: you and the supplier settle the deal directly.",
     "status": {
       "open": "Open",
