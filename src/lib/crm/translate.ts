@@ -13,12 +13,11 @@ import { getInquiryForParty, type WriteResult } from "@/src/lib/crm/inquiries";
  * 换语言重译时覆盖）。访问控制与消息读取同源：仅当事双方可译。
  */
 
-/** 翻译走文本模型的优先级：deepseek 便宜且中西英质量稳，其余兜底。 */
-const TRANSLATION_PROVIDERS: readonly AiProviderId[] = ["deepseek", "openrouter", "kimi"];
+/** 翻译走文本模型的优先级：deepseek 便宜且中西英质量稳，kimi 兜底。 */
+const TRANSLATION_PROVIDERS: readonly AiProviderId[] = ["deepseek", "kimi"];
 
 const PROVIDER_KEY_ENV: Record<string, string> = {
   deepseek: "DEEPSEEK_API_KEY",
-  openrouter: "OPENROUTER_API_KEY",
   kimi: "KIMI_API_KEY",
 };
 

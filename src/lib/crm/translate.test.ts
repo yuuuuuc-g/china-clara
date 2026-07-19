@@ -3,17 +3,15 @@ import { pickTranslationProvider, translateInquiryMessage } from "@/src/lib/crm/
 
 describe("crm translate — provider selection", () => {
   it("picks deepseek first when configured", () => {
-    expect(
-      pickTranslationProvider({ DEEPSEEK_API_KEY: "x", OPENROUTER_API_KEY: "y" })
-    ).toBe("deepseek");
+    expect(pickTranslationProvider({ DEEPSEEK_API_KEY: "x", KIMI_API_KEY: "z" })).toBe("deepseek");
   });
 
-  it("falls back through openrouter to kimi", () => {
-    expect(pickTranslationProvider({ OPENROUTER_API_KEY: "y" })).toBe("openrouter");
+  it("falls back to kimi when deepseek is absent", () => {
     expect(pickTranslationProvider({ KIMI_API_KEY: "z" })).toBe("kimi");
   });
 
-  it("returns null when nothing is configured", () => {
+  it("ignores openrouter and returns null when nothing else is configured", () => {
+    expect(pickTranslationProvider({ OPENROUTER_API_KEY: "y" })).toBeNull();
     expect(pickTranslationProvider({})).toBeNull();
   });
 });
