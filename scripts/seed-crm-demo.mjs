@@ -95,16 +95,22 @@ async function main() {
     throw new Error("product lumina-led-panel-40w not found — run supabase/seed.sql first");
   }
 
+  await seedInquiryThread(buyerId, supplierId, product.id);
+  await seedCommunityPost(buyerId);
+  await seedZhOnlyArticle();
+}
+
+/** 样例询盘线程（幂等：已存在则跳过）。抽成函数避免 main 里 early-return 漏掉后续 seed。 */
+async function seedInquiryThread(buyerId, supplierId, productId) {
   const { data: existingInquiry } = await admin
     .schema("crm")
     .from("inquiries")
     .select("id")
     .eq("buyer_profile_id", buyerId)
-    .eq("product_id", product.id)
+    .eq("product_id", productId)
     .maybeSingle();
   if (existingInquiry) {
     console.log(`Demo inquiry already exists: ${existingInquiry.id}`);
-    await seedCommunityPost(buyerId);
     return;
   }
 
@@ -112,7 +118,7 @@ async function main() {
     .schema("crm")
     .from("inquiries")
     .insert({
-      product_id: product.id,
+      product_id: productId,
       buyer_profile_id: buyerId,
       quantity: 1000,
       target_port: "Callao, Perú",
@@ -141,8 +147,40 @@ async function main() {
 
   console.log(`Seeded demo inquiry ${inquiry.id}`);
   console.log("Accounts: demo-buyer@chinaclara.dev / demo-supplier@chinaclara.dev (password = DEMO_PASSWORD)");
+}
 
-  await seedCommunityPost(buyerId);
+/** 只有中文源文的已发布文章：给文章翻译管线当输入（跑一次 translate-articles cron 即补齐西/英）。 */
+async function seedZhOnlyArticle() {
+  const slug = "guangjiaohui-caigou-zhinan-demo";
+  const { data: existing } = await admin
+    .schema("content")
+    .from("articles")
+    .select("id")
+    .eq("slug", slug)
+    .maybeSingle();
+  if (existing) {
+    console.log(`Demo zh-only article already exists: ${existing.id}`);
+    return;
+  }
+  const { data: article, error } = await admin
+    .schema("content")
+    .from("articles")
+    .insert({ slug, source_lang: "zh", status: "published", published_at: new Date().toISOString() })
+    .select("id")
+    .single();
+  if (error) throw new Error(`article insert failed: ${error.message}`);
+
+  const { error: trError } = await admin.schema("content").from("article_translations").insert({
+    article_id: article.id,
+    lang: "zh",
+    title: "第一次逛广交会：拉美买家实用指南",
+    summary: "从展位预约到样品谈判，一文说清拉美买家参加广交会的关键动作。",
+    body_md:
+      "## 行前准备\n\n1. 提前 30 天办好签证与邀请函。\n2. 用官方 App 预约目标展位，按产业带规划动线。\n\n## 展会现场\n\n- 名片准备双语版本，微信二维码印在背面。\n- 样品谈判先问 **MOQ 与交期**，价格放在最后。\n\n> 广交会的真正价值不在下单，而在建立可回访的供应商名单。",
+    human_reviewed: true,
+  });
+  if (trError) throw new Error(`zh translation insert failed: ${trError.message}`);
+  console.log(`Seeded demo zh-only article ${article.id}`);
 }
 
 /** 社区样例帖（已发布），让 /community 列表不是空状态。幂等：按 slug 跳过。 */
