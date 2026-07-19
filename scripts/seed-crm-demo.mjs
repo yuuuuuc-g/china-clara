@@ -72,6 +72,9 @@ async function main() {
   const supplierId = await ensureUser("demo-supplier@chinaclara.dev", "朗明电子（演示）", "zh");
   await ensureProfile(supplierId, "朗明电子（演示）", "zh", "supplier");
 
+  const editorId = await ensureUser("demo-editor@chinaclara.dev", "内容编辑（演示）", "zh");
+  await ensureProfile(editorId, "内容编辑（演示）", "zh", "editor");
+
   const { data: supplier, error: supplierError } = await admin
     .schema("catalog")
     .from("suppliers")

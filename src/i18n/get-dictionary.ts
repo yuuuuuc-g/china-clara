@@ -89,6 +89,20 @@ export interface Dictionary {
     noPayments: string;
     status: Record<InquiryStatus, string>;
   };
+  moderation: {
+    /** 审核后台（editor/admin 专用，不进公开导航）。 */
+    title: string;
+    postsQueue: string;
+    suppliersQueue: string;
+    approve: string;
+    reject: string;
+    emptyQueue: string;
+  };
+  intel: {
+    /** 情报雷达列表标题与空状态。 */
+    latest: string;
+    empty: string;
+  };
   community: {
     empty: string;
     backToList: string;

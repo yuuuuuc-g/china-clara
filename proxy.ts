@@ -24,8 +24,9 @@ async function withRefreshedSession(req: NextRequest): Promise<NextResponse> {
       },
     },
   });
-  // getUser() 内部完成过期检测与 refresh；结果本身在这里不重要
-  await supabase.auth.getUser();
+  // getUser() 内部完成过期检测与 refresh；结果本身在这里不重要。
+  // 携带已作废 refresh token 的请求（如登出后残留 cookie）刷新必然失败，属预期，静默即可。
+  await supabase.auth.getUser().catch(() => undefined);
   return res;
 }
 

@@ -88,6 +88,18 @@
       "archived": "Archived"
     }
   },
+  "moderation": {
+    "title": "Moderation console",
+    "postsQueue": "Pending posts",
+    "suppliersQueue": "Pending suppliers",
+    "approve": "Approve",
+    "reject": "Reject",
+    "emptyQueue": "Nothing pending right now."
+  },
+  "intel": {
+    "latest": "Latest signals",
+    "empty": "No signals on the radar yet. The system collects them automatically every day."
+  },
   "community": {
     "empty": "No community posts yet. Be the first to share your sourcing experience.",
     "backToList": "Back to community",

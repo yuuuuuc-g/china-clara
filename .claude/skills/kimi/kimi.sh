@@ -44,7 +44,13 @@ for f in ${FILES[@]+"${FILES[@]}"}; do
   USER_CONTENT+=$'\n\n'"<file path=\"$f\">"$'\n'"$(cat "$f")"$'\n'"</file>"
 done
 if [ ! -t 0 ]; then
-  STDIN_CONTENT="$(cat)"
+  # 后台执行环境可能给一个永不关闭的空管道：首行等待最多 5 秒，
+  # 超时视为无 stdin 输入，避免 cat 无限阻塞（真实管道数据几乎总在 5 秒内到达）。
+  if IFS= read -r -t 5 STDIN_FIRST; then
+    STDIN_CONTENT="$STDIN_FIRST"$'\n'"$(cat)"
+  else
+    STDIN_CONTENT=""
+  fi
   [ -n "$STDIN_CONTENT" ] && USER_CONTENT+=$'\n\n'"<stdin>"$'\n'"$STDIN_CONTENT"$'\n'"</stdin>"
 fi
 

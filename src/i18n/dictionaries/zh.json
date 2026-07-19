@@ -88,6 +88,18 @@
       "archived": "已归档"
     }
   },
+  "moderation": {
+    "title": "审核后台",
+    "postsQueue": "待审文章",
+    "suppliersQueue": "待审供应商",
+    "approve": "通过",
+    "reject": "驳回",
+    "emptyQueue": "当前没有待审条目。"
+  },
+  "intel": {
+    "latest": "最新情报",
+    "empty": "情报雷达还没有内容，系统每日自动抓取。"
+  },
   "community": {
     "empty": "社区还没有内容，来分享第一篇采购经验吧。",
     "backToList": "返回社区",
