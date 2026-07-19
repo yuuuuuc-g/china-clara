@@ -37,11 +37,46 @@ paths:
         - { name: per_page, in: query, schema: { type: integer, maximum: 50, default: 20 } }
       responses:
         "200": { $ref: "#/components/responses/Envelope" }
+  /community/posts:
+    get:
+      summary: 社区已发布帖子列表（公开）
+      parameters:
+        - { name: page, in: query, schema: { type: integer, minimum: 1, default: 1 } }
+        - { name: per_page, in: query, schema: { type: integer, maximum: 50, default: 20 } }
+      responses:
+        "200": { $ref: "#/components/responses/Envelope" }
+    post:
+      summary: 发帖（scope community:write；作者 = PAT 所有者；先审后发）
+      security: [{ pat: [] }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [lang, title, body_md]
+              properties:
+                lang: { type: string, enum: [es, en, zh] }
+                title: { type: string, minLength: 4, maxLength: 160 }
+                body_md: { type: string, minLength: 20, maxLength: 20000 }
+      responses:
+        "201": { $ref: "#/components/responses/Envelope" }
+        "401": { $ref: "#/components/responses/Envelope" }
+        "422": { $ref: "#/components/responses/Envelope" }
+  /community/posts/{slug}:
+    get:
+      summary: 社区帖子详情（公开，仅已发布）
+      parameters:
+        - { name: slug, in: path, required: true, schema: { type: string } }
+      responses:
+        "200": { $ref: "#/components/responses/Envelope" }
+        "404": { $ref: "#/components/responses/Envelope" }
   /inquiries:
     get:
-      summary: 我的询盘列表（scope inquiries:read；身份 = PAT 所有者）
+      summary: 我的询盘列表（scope inquiries:read；身份 = PAT 所有者；role=supplier 时为名下供应商收件箱）
       security: [{ pat: [] }]
       parameters:
+        - { name: role, in: query, schema: { type: string, enum: [buyer, supplier], default: buyer } }
         - { name: lang, in: query, schema: { type: string, enum: [es, en, zh], default: es } }
         - { name: page, in: query, schema: { type: integer, minimum: 1, default: 1 } }
         - { name: per_page, in: query, schema: { type: integer, maximum: 50, default: 20 } }

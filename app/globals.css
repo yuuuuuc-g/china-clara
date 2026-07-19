@@ -1,8 +1,6 @@
 @import "tailwindcss";
-
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+/* Tailwind v4 不读 tailwind.config.ts 的 plugins 数组，typography（prose 类）必须在这里声明 */
+@plugin "@tailwindcss/typography";
 
 :root {
   --font-geist-sans: Arial, Helvetica, sans-serif;

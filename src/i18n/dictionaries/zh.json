@@ -55,6 +55,9 @@
   },
   "crm": {
     "myInquiries": "我的询盘",
+    "received": "收到的询盘",
+    "sent": "发出的询盘",
+    "emptyReceived": "还没有收到买家询盘。",
     "empty": "你还没有发起过询盘。去找一家供应商，发出第一份询价吧。",
     "browseSuppliers": "浏览供应商",
     "newInquiry": "发起询盘",
@@ -84,6 +87,28 @@
       "closed": "已关闭",
       "archived": "已归档"
     }
+  },
+  "moderation": {
+    "title": "审核后台",
+    "postsQueue": "待审文章",
+    "suppliersQueue": "待审供应商",
+    "approve": "通过",
+    "reject": "驳回",
+    "emptyQueue": "当前没有待审条目。"
+  },
+  "intel": {
+    "latest": "最新情报",
+    "empty": "情报雷达还没有内容，系统每日自动抓取。"
+  },
+  "community": {
+    "empty": "社区还没有内容，来分享第一篇采购经验吧。",
+    "backToList": "返回社区",
+    "writePost": "写文章",
+    "postTitle": "标题",
+    "postBody": "正文（Markdown）",
+    "submit": "提交审核",
+    "submittedNotice": "已提交！审核通过后即会展示。",
+    "reviewNotice": "文章需经编辑审核后才会公开展示。"
   },
   "tagline": "China, clara. 让拉美读懂中国，让好工厂被看见。"
 }

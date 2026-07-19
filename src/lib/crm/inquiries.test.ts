@@ -1,6 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import {
   listInquiriesForBuyer,
+  listInquiriesForSupplier,
+  hasOwnedSuppliers,
   getInquiryForParty,
   createInquiry,
   addInquiryMessage,
@@ -44,6 +46,18 @@ describe("crm inquiries — unconfigured behavior", () => {
     });
     expect(result.page).toBe(1);
     expect(result.perPage).toBe(50);
+  });
+
+  it("listInquiriesForSupplier returns an empty page instead of throwing", async () => {
+    const result = await listInquiriesForSupplier({
+      supplierOwnerProfileId: "p1",
+      lang: "es",
+    });
+    expect(result).toEqual({ items: [], total: 0, page: 1, perPage: 20 });
+  });
+
+  it("hasOwnedSuppliers returns false instead of throwing", async () => {
+    await expect(hasOwnedSuppliers("p1")).resolves.toBe(false);
   });
 
   it("getInquiryForParty returns null instead of throwing", async () => {

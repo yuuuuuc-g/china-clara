@@ -4,7 +4,12 @@ import { notFound } from "next/navigation";
 import { isLocale, type Locale } from "@/src/i18n/config";
 import { getDictionary, type Dictionary } from "@/src/i18n/get-dictionary";
 import { getSessionProfile } from "@/src/lib/auth/session";
-import { listInquiriesForBuyer } from "@/src/lib/crm/inquiries";
+import {
+  hasOwnedSuppliers,
+  listInquiriesForBuyer,
+  listInquiriesForSupplier,
+  type InquiryListItem,
+} from "@/src/lib/crm/inquiries";
 import { formatDate } from "@/src/lib/format";
 import { SignOutButton } from "@/src/components/site/SignOutButton";
 import { InquiryStatusBadge } from "@/src/components/site/InquiryStatusBadge";
@@ -48,6 +53,7 @@ export default async function InquiriesPage({
   if (!isLocale(locale)) notFound();
   const dict = await getDictionary(locale);
   const session = await getSessionProfile();
+  const isSupplier = session ? await hasOwnedSuppliers(session.userId) : false;
 
   return (
     <div className="mx-auto max-w-3xl px-5 py-12 sm:px-8 sm:py-16">
@@ -70,6 +76,8 @@ export default async function InquiriesPage({
 
       {!session ? (
         <LoginGate locale={locale} dict={dict} />
+      ) : isSupplier ? (
+        <SupplierInquiryLists locale={locale} dict={dict} profileId={session.userId} />
       ) : (
         <InquiryList locale={locale} dict={dict} buyerProfileId={session.userId} />
       )}
@@ -88,22 +96,90 @@ async function InquiryList({
 }) {
   const { items } = await listInquiriesForBuyer({ buyerProfileId, lang: locale });
 
+  return <InquiryCards locale={locale} dict={dict} items={items} className="mt-8" showBrowseLink />;
+}
+
+async function SupplierInquiryLists({
+  locale,
+  dict,
+  profileId,
+}: {
+  locale: Locale;
+  dict: Dictionary;
+  profileId: string;
+}) {
+  const [{ items: receivedItems }, { items: sentItems }] = await Promise.all([
+    listInquiriesForSupplier({ supplierOwnerProfileId: profileId, lang: locale }),
+    listInquiriesForBuyer({ buyerProfileId: profileId, lang: locale }),
+  ]);
+
+  return (
+    <div className="mt-10">
+      <section>
+        <h2 className="text-xl font-semibold tracking-tight">{dict.crm.received}</h2>
+        <InquiryCards
+          locale={locale}
+          dict={dict}
+          items={receivedItems}
+          className="mt-4"
+          emptyMessage={dict.crm.emptyReceived}
+          showBuyerName
+        />
+      </section>
+
+      <section className="mt-10">
+        <h2 className="text-xl font-semibold tracking-tight">{dict.crm.sent}</h2>
+        <InquiryCards
+          locale={locale}
+          dict={dict}
+          items={sentItems}
+          className="mt-4"
+          showBrowseLink
+        />
+      </section>
+    </div>
+  );
+}
+
+function InquiryCards({
+  locale,
+  dict,
+  items,
+  className,
+  emptyMessage = dict.crm.empty,
+  showBrowseLink = false,
+  showBuyerName = false,
+}: {
+  locale: Locale;
+  dict: Dictionary;
+  items: InquiryListItem[];
+  className: string;
+  emptyMessage?: string;
+  showBrowseLink?: boolean;
+  showBuyerName?: boolean;
+}) {
   if (items.length === 0) {
     return (
-      <div className="mt-10 rounded-2xl border border-neutral-200 p-8 text-center dark:border-neutral-800">
-        <p className="text-sm leading-relaxed text-neutral-600 dark:text-neutral-400">{dict.crm.empty}</p>
-        <Link
-          href={`/${locale}/suppliers`}
-          className="mt-5 inline-block rounded-lg bg-neutral-900 px-5 py-2.5 text-sm font-medium text-white transition hover:bg-neutral-700 dark:bg-white dark:text-neutral-900 dark:hover:bg-neutral-200"
-        >
-          {dict.crm.browseSuppliers}
-        </Link>
+      <div
+        className={`${className} rounded-2xl border border-neutral-200 p-8 text-center dark:border-neutral-800`}
+      >
+        <p className="text-sm leading-relaxed text-neutral-600 dark:text-neutral-400">
+          {emptyMessage}
+        </p>
+        {showBrowseLink && (
+          <Link
+            href={`/${locale}/suppliers`}
+            className="mt-5 inline-block rounded-lg bg-neutral-900 px-5 py-2.5 text-sm font-medium text-white transition hover:bg-neutral-700 dark:bg-white dark:text-neutral-900 dark:hover:bg-neutral-200"
+          >
+            {dict.crm.browseSuppliers}
+          </Link>
+        )}
       </div>
     );
   }
 
   return (
-    <ul className="mt-8 space-y-4">
+    <ul className={`${className} space-y-4`}>
       {items.map((inq) => (
         <li key={inq.id}>
           <Link
@@ -120,6 +196,11 @@ async function InquiryList({
               {inq.product?.supplierName && (
                 <span>
                   {dict.crm.supplier}: {inq.product.supplierName}
+                </span>
+              )}
+              {showBuyerName && inq.buyerName && (
+                <span>
+                  {dict.crm.buyer}: {inq.buyerName}
                 </span>
               )}
               <span>

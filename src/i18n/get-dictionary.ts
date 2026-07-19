@@ -55,6 +55,10 @@ export interface Dictionary {
   };
   crm: {
     myInquiries: string;
+    /** 供应商收件箱分栏标题。 */
+    received: string;
+    sent: string;
+    emptyReceived: string;
     empty: string;
     browseSuppliers: string;
     newInquiry: string;
@@ -84,6 +88,31 @@ export interface Dictionary {
     /** 铁律 #3 的用户侧表达：平台不介入支付。 */
     noPayments: string;
     status: Record<InquiryStatus, string>;
+  };
+  moderation: {
+    /** 审核后台（editor/admin 专用，不进公开导航）。 */
+    title: string;
+    postsQueue: string;
+    suppliersQueue: string;
+    approve: string;
+    reject: string;
+    emptyQueue: string;
+  };
+  intel: {
+    /** 情报雷达列表标题与空状态。 */
+    latest: string;
+    empty: string;
+  };
+  community: {
+    empty: string;
+    backToList: string;
+    writePost: string;
+    postTitle: string;
+    postBody: string;
+    /** 提交按钮：发帖先进审核队列（community.posts 默认 status=review）。 */
+    submit: string;
+    submittedNotice: string;
+    reviewNotice: string;
   };
   tagline: string;
 }

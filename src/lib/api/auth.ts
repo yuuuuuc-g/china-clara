@@ -13,6 +13,7 @@ export const SCOPES = [
   "catalog:write",
   "inquiries:read",
   "inquiries:write",
+  "community:write",
 ] as const;
 export type Scope = (typeof SCOPES)[number];
 

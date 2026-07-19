@@ -55,6 +55,9 @@
   },
   "crm": {
     "myInquiries": "Mis consultas",
+    "received": "Consultas recibidas",
+    "sent": "Consultas enviadas",
+    "emptyReceived": "Aún no has recibido consultas de compradores.",
     "empty": "Aún no has enviado ninguna consulta. Encuentra un proveedor y pide tu primera cotización.",
     "browseSuppliers": "Explorar proveedores",
     "newInquiry": "Nueva consulta",
@@ -84,6 +87,28 @@
       "closed": "Cerrada",
       "archived": "Archivada"
     }
+  },
+  "moderation": {
+    "title": "Panel de moderación",
+    "postsQueue": "Publicaciones pendientes",
+    "suppliersQueue": "Proveedores pendientes",
+    "approve": "Aprobar",
+    "reject": "Rechazar",
+    "emptyQueue": "Nada pendiente por ahora."
+  },
+  "intel": {
+    "latest": "Últimas señales",
+    "empty": "Aún no hay señales en el radar. El sistema las recoge automáticamente cada día."
+  },
+  "community": {
+    "empty": "Aún no hay publicaciones de la comunidad. Sé el primero en compartir tu experiencia.",
+    "backToList": "Volver a la comunidad",
+    "writePost": "Escribir publicación",
+    "postTitle": "Título",
+    "postBody": "Contenido (Markdown)",
+    "submit": "Enviar a revisión",
+    "submittedNotice": "¡Gracias! Tu publicación está en revisión y aparecerá pronto.",
+    "reviewNotice": "Las publicaciones pasan por una revisión editorial antes de aparecer."
   },
   "tagline": "China, clara. Tu primera parada para entender China y encontrar proveedores confiables."
 }

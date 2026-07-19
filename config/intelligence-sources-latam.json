@@ -1,0 +1,27 @@
+[
+  {
+    "id": "mercopress",
+    "name": "MercoPress",
+    "url": "https://en.mercopress.com/rss"
+  },
+  {
+    "id": "china-briefing",
+    "name": "China Briefing",
+    "url": "https://www.china-briefing.com/news/feed/"
+  },
+  {
+    "id": "dialogue-earth",
+    "name": "Dialogue Earth",
+    "url": "https://dialogue.earth/en/feed/"
+  },
+  {
+    "id": "scmp-china",
+    "name": "SCMP China",
+    "url": "https://www.scmp.com/rss/4/feed"
+  },
+  {
+    "id": "americas-quarterly",
+    "name": "Americas Quarterly",
+    "url": "https://www.americasquarterly.org/feed/"
+  }
+]

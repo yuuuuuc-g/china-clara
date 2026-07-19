@@ -38,6 +38,8 @@ export interface InquiryListItem {
   targetPort: string | null;
   createdAt: string;
   updatedAt: string;
+  /** 供应商收件箱视角展示买家名；买家视角恒为 null。 */
+  buyerName: string | null;
   product: InquiryProductRef | null;
 }
 
@@ -71,6 +73,15 @@ interface RawInquiry {
   status: InquiryStatus;
   created_at: string;
   updated_at: string;
+}
+
+interface RawId {
+  id: string;
+}
+
+interface RawProfile {
+  id: string;
+  display_name: string | null;
 }
 
 interface RawProductJoin {
@@ -170,9 +181,113 @@ export async function listInquiriesForBuyer(opts: {
     targetPort: r.target_port,
     createdAt: r.created_at,
     updatedAt: r.updated_at,
+    buyerName: null,
     product: toProductRef(products.get(r.product_id), opts.lang),
   }));
   return { items, total: count ?? items.length, page, perPage };
+}
+
+/** 供应商收件箱：列出发往我名下供应商所有商品的询盘，按 updated_at 倒序分页。 */
+export async function listInquiriesForSupplier(opts: {
+  supplierOwnerProfileId: string;
+  lang: Locale;
+  page?: number;
+  perPage?: number;
+}): Promise<{ items: InquiryListItem[]; total: number; page: number; perPage: number }> {
+  const page = Math.max(1, opts.page ?? 1);
+  const perPage = Math.min(50, Math.max(1, opts.perPage ?? 20));
+  const emptyPage = { items: [], total: 0, page, perPage };
+  if (!isConfigured()) return emptyPage;
+
+  const client = serviceClient();
+  const { data: supplierRows, error: suppliersError } = await client
+    .schema("catalog")
+    .from("suppliers")
+    .select("id")
+    .eq("owner_profile_id", opts.supplierOwnerProfileId);
+  if (suppliersError) {
+    console.error("[crm.inquiries] listInquiriesForSupplier failed:", suppliersError.message);
+    return emptyPage;
+  }
+  const supplierIds = ((supplierRows ?? []) as unknown as RawId[]).map((row) => row.id);
+  if (supplierIds.length === 0) return emptyPage;
+
+  const { data: productRows, error: productsError } = await client
+    .schema("catalog")
+    .from("products")
+    .select("id")
+    .in("supplier_id", supplierIds);
+  if (productsError) {
+    console.error("[crm.inquiries] listInquiriesForSupplier failed:", productsError.message);
+    return emptyPage;
+  }
+  const productIds = ((productRows ?? []) as unknown as RawId[]).map((row) => row.id);
+  if (productIds.length === 0) return emptyPage;
+
+  const { data, error, count } = await client
+    .schema("crm")
+    .from("inquiries")
+    .select("id, product_id, buyer_profile_id, quantity, target_port, status, created_at, updated_at", {
+      count: "exact",
+    })
+    .in("product_id", productIds)
+    .order("updated_at", { ascending: false })
+    .range((page - 1) * perPage, page * perPage - 1);
+  if (error) {
+    console.error("[crm.inquiries] listInquiriesForSupplier failed:", error.message);
+    return emptyPage;
+  }
+
+  const rows = (data ?? []) as unknown as RawInquiry[];
+  if (rows.length === 0) return { items: [], total: count ?? 0, page, perPage };
+  const [products, profilesResult] = await Promise.all([
+    fetchProducts([...new Set(rows.map((row) => row.product_id))]),
+    client
+      .schema("crm")
+      .from("profiles")
+      .select("id, display_name")
+      .in("id", [...new Set(rows.map((row) => row.buyer_profile_id))]),
+  ]);
+
+  let buyerNames = new Map<string, string | null>();
+  if (profilesResult.error) {
+    console.error("[crm.inquiries] listInquiriesForSupplier failed:", profilesResult.error.message);
+  } else {
+    buyerNames = new Map(
+      ((profilesResult.data ?? []) as unknown as RawProfile[]).map((profile) => [
+        profile.id,
+        profile.display_name,
+      ])
+    );
+  }
+
+  const items: InquiryListItem[] = rows.map((row) => ({
+    id: row.id,
+    status: row.status,
+    quantity: row.quantity,
+    targetPort: row.target_port,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+    buyerName: buyerNames.get(row.buyer_profile_id) ?? null,
+    product: toProductRef(products.get(row.product_id), opts.lang),
+  }));
+  return { items, total: count ?? items.length, page, perPage };
+}
+
+/** 该 profile 是否名下有供应商（决定询盘中心是否显示收件箱分栏）。未配置返回 false。 */
+export async function hasOwnedSuppliers(profileId: string): Promise<boolean> {
+  if (!isConfigured()) return false;
+
+  const { error, count } = await serviceClient()
+    .schema("catalog")
+    .from("suppliers")
+    .select("id", { count: "exact", head: true })
+    .eq("owner_profile_id", profileId);
+  if (error) {
+    console.error("[crm.inquiries] hasOwnedSuppliers failed:", error.message);
+    return false;
+  }
+  return (count ?? 0) > 0;
 }
 
 /**
@@ -226,6 +341,7 @@ export async function getInquiryForParty(opts: {
     targetPort: inquiry.target_port,
     createdAt: inquiry.created_at,
     updatedAt: inquiry.updated_at,
+    buyerName: null,
     buyerProfileId: inquiry.buyer_profile_id,
     viewerRole: isBuyer ? "buyer" : "supplier",
     product: toProductRef(join, opts.lang),
