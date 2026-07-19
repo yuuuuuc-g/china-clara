@@ -85,5 +85,15 @@
       "archived": "Archivada"
     }
   },
+  "community": {
+    "empty": "Aún no hay publicaciones de la comunidad. Sé el primero en compartir tu experiencia.",
+    "backToList": "Volver a la comunidad",
+    "writePost": "Escribir publicación",
+    "postTitle": "Título",
+    "postBody": "Contenido (Markdown)",
+    "submit": "Enviar a revisión",
+    "submittedNotice": "¡Gracias! Tu publicación está en revisión y aparecerá pronto.",
+    "reviewNotice": "Las publicaciones pasan por una revisión editorial antes de aparecer."
+  },
   "tagline": "China, clara. Tu primera parada para entender China y encontrar proveedores confiables."
 }

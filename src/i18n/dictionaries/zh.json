@@ -85,5 +85,15 @@
       "archived": "已归档"
     }
   },
+  "community": {
+    "empty": "社区还没有内容，来分享第一篇采购经验吧。",
+    "backToList": "返回社区",
+    "writePost": "写文章",
+    "postTitle": "标题",
+    "postBody": "正文（Markdown）",
+    "submit": "提交审核",
+    "submittedNotice": "已提交！审核通过后即会展示。",
+    "reviewNotice": "文章需经编辑审核后才会公开展示。"
+  },
   "tagline": "China, clara. 让拉美读懂中国，让好工厂被看见。"
 }

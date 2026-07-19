@@ -101,6 +101,7 @@ async function main() {
     .maybeSingle();
   if (existingInquiry) {
     console.log(`Demo inquiry already exists: ${existingInquiry.id}`);
+    await seedCommunityPost(buyerId);
     return;
   }
 
@@ -137,6 +138,40 @@ async function main() {
 
   console.log(`Seeded demo inquiry ${inquiry.id}`);
   console.log("Accounts: demo-buyer@chinaclara.dev / demo-supplier@chinaclara.dev (password = DEMO_PASSWORD)");
+
+  await seedCommunityPost(buyerId);
+}
+
+/** 社区样例帖（已发布），让 /community 列表不是空状态。幂等：按 slug 跳过。 */
+async function seedCommunityPost(authorId) {
+  const slug = "primera-importacion-desde-yiwu-demo";
+  const { data: existing } = await admin
+    .schema("community")
+    .from("posts")
+    .select("id")
+    .eq("slug", slug)
+    .maybeSingle();
+  if (existing) {
+    console.log(`Demo community post already exists: ${existing.id}`);
+    return;
+  }
+  const { data: post, error } = await admin
+    .schema("community")
+    .from("posts")
+    .insert({
+      author_profile_id: authorId,
+      slug,
+      lang: "es",
+      title: "Lo que aprendí en mi primera importación desde Yiwu",
+      body_md:
+        "## Contexto\n\nPrimera compra: 2000 bolsas de algodón personalizadas. Comparto lo que me hubiera gustado saber antes.\n\n## Tres lecciones\n\n1. **Pide muestras siempre**, aunque el proveedor tenga buenas certificaciones.\n2. El MOQ casi siempre es negociable si aceptas plazos más largos.\n3. Presupuesta la inspección pre-embarque: cuesta poco comparado con un contenedor defectuoso.\n\n> La transparencia del proveedor en los primeros mensajes predice cómo será el resto del trato.",
+      status: "published",
+      published_at: new Date().toISOString(),
+    })
+    .select("id")
+    .single();
+  if (error) throw new Error(`community post insert failed: ${error.message}`);
+  console.log(`Seeded demo community post ${post.id}`);
 }
 
 main().catch((err) => {

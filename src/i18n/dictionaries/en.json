@@ -85,5 +85,15 @@
       "archived": "Archived"
     }
   },
+  "community": {
+    "empty": "No community posts yet. Be the first to share your sourcing experience.",
+    "backToList": "Back to community",
+    "writePost": "Write a post",
+    "postTitle": "Title",
+    "postBody": "Content (Markdown)",
+    "submit": "Submit for review",
+    "submittedNotice": "Thanks! Your post is under review and will appear soon.",
+    "reviewNotice": "Posts go through editorial review before they appear."
+  },
   "tagline": "China, clara. Your first stop to understand China and find trusted suppliers."
 }

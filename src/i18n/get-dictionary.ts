@@ -85,6 +85,17 @@ export interface Dictionary {
     noPayments: string;
     status: Record<InquiryStatus, string>;
   };
+  community: {
+    empty: string;
+    backToList: string;
+    writePost: string;
+    postTitle: string;
+    postBody: string;
+    /** 提交按钮：发帖先进审核队列（community.posts 默认 status=review）。 */
+    submit: string;
+    submittedNotice: string;
+    reviewNotice: string;
+  };
   tagline: string;
 }
 
