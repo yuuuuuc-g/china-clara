@@ -39,5 +39,46 @@
     "founded": "Fundada en",
     "employees": "Empleados"
   },
+  "auth": {
+    "signIn": "Iniciar sesión",
+    "signUp": "Crear cuenta",
+    "email": "Correo electrónico",
+    "password": "Contraseña",
+    "displayName": "Nombre o empresa",
+    "noAccount": "¿No tienes cuenta? Créala aquí",
+    "hasAccount": "¿Ya tienes cuenta? Inicia sesión",
+    "checkEmail": "Revisa tu correo para confirmar la cuenta y luego inicia sesión.",
+    "signOut": "Cerrar sesión",
+    "loginRequired": "Inicia sesión para enviar solicitudes de cotización y seguir tus consultas.",
+    "notConfigured": "La autenticación no está configurada en este entorno.",
+    "genericError": "No se pudo completar la operación. Inténtalo de nuevo."
+  },
+  "crm": {
+    "myInquiries": "Mis consultas",
+    "empty": "Aún no has enviado ninguna consulta. Encuentra un proveedor y pide tu primera cotización.",
+    "browseSuppliers": "Explorar proveedores",
+    "newInquiry": "Nueva consulta",
+    "requestQuote": "Pedir cotización",
+    "product": "Producto",
+    "supplier": "Proveedor",
+    "quantity": "Cantidad",
+    "targetPort": "Puerto de destino",
+    "optional": "opcional",
+    "buyer": "Comprador",
+    "message": "Mensaje",
+    "messagePlaceholder": "Describe especificaciones, cantidad y plazos de entrega…",
+    "send": "Enviar",
+    "backToInquiries": "Volver a mis consultas",
+    "you": "Tú",
+    "productUnavailable": "Producto no disponible",
+    "noPayments": "China Clara no procesa pagos: el trato lo cierran directamente tú y el proveedor.",
+    "status": {
+      "open": "Abierta",
+      "replied": "Respondida",
+      "negotiating": "En negociación",
+      "closed": "Cerrada",
+      "archived": "Archivada"
+    }
+  },
   "tagline": "China, clara. Tu primera parada para entender China y encontrar proveedores confiables."
 }

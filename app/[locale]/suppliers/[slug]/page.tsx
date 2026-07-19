@@ -104,6 +104,12 @@ export default async function SupplierDetailPage({
                 <span>{priceLabel(p, locale, dict.catalog.priceOnRequest)}</span>
                 {p.moq !== null && <span>{dict.catalog.moq}: {p.moq}</span>}
               </div>
+              <Link
+                href={`/${locale}/inquiries/new?product=${p.slug}`}
+                className="mt-4 inline-block rounded-lg bg-neutral-900 px-4 py-2 text-sm font-medium text-white transition hover:bg-neutral-700 dark:bg-white dark:text-neutral-900 dark:hover:bg-neutral-200"
+              >
+                {dict.crm.requestQuote}
+              </Link>
             </li>
           ))}
         </ul>

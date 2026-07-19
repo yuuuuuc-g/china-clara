@@ -1,5 +1,6 @@
 import type { Locale } from "@/src/i18n/config";
 import type { ModuleId, NavKey } from "@/src/lib/modules";
+import type { InquiryStatus } from "@/src/lib/crm/inquiries";
 
 export interface Dictionary {
   nav: Record<NavKey, string>;
@@ -35,6 +36,47 @@ export interface Dictionary {
     location: string;
     founded: string;
     employees: string;
+  };
+  auth: {
+    signIn: string;
+    signUp: string;
+    email: string;
+    password: string;
+    displayName: string;
+    noAccount: string;
+    hasAccount: string;
+    /** 注册后需邮箱验证时的提示。 */
+    checkEmail: string;
+    signOut: string;
+    /** 未登录访问询盘中心时的引导文案。 */
+    loginRequired: string;
+    notConfigured: string;
+    genericError: string;
+  };
+  crm: {
+    myInquiries: string;
+    empty: string;
+    browseSuppliers: string;
+    newInquiry: string;
+    /** 商品卡片上的发起询盘按钮。 */
+    requestQuote: string;
+    product: string;
+    supplier: string;
+    quantity: string;
+    targetPort: string;
+    /** 表单里的「选填」标记。 */
+    optional: string;
+    buyer: string;
+    message: string;
+    messagePlaceholder: string;
+    send: string;
+    backToInquiries: string;
+    /** 消息线程里标记自己发言。 */
+    you: string;
+    productUnavailable: string;
+    /** 铁律 #3 的用户侧表达：平台不介入支付。 */
+    noPayments: string;
+    status: Record<InquiryStatus, string>;
   };
   tagline: string;
 }

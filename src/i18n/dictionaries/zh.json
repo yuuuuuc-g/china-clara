@@ -39,5 +39,46 @@
     "founded": "成立年份",
     "employees": "员工规模"
   },
+  "auth": {
+    "signIn": "登录",
+    "signUp": "注册",
+    "email": "邮箱",
+    "password": "密码",
+    "displayName": "姓名或公司",
+    "noAccount": "还没有账号？注册一个",
+    "hasAccount": "已有账号？直接登录",
+    "checkEmail": "请查收确认邮件，完成验证后再登录。",
+    "signOut": "退出登录",
+    "loginRequired": "登录后即可发起询盘并跟进沟通。",
+    "notConfigured": "当前环境未配置认证服务。",
+    "genericError": "操作失败，请重试。"
+  },
+  "crm": {
+    "myInquiries": "我的询盘",
+    "empty": "你还没有发起过询盘。去找一家供应商，发出第一份询价吧。",
+    "browseSuppliers": "浏览供应商",
+    "newInquiry": "发起询盘",
+    "requestQuote": "询价",
+    "product": "商品",
+    "supplier": "供应商",
+    "quantity": "数量",
+    "targetPort": "目的港",
+    "optional": "选填",
+    "buyer": "买家",
+    "message": "留言",
+    "messagePlaceholder": "写明规格、数量与交期要求…",
+    "send": "发送",
+    "backToInquiries": "返回我的询盘",
+    "you": "我",
+    "productUnavailable": "商品已下架",
+    "noPayments": "China Clara 不介入支付：交易细节由你与供应商直接商定。",
+    "status": {
+      "open": "待回复",
+      "replied": "已回复",
+      "negotiating": "洽谈中",
+      "closed": "已关闭",
+      "archived": "已归档"
+    }
+  },
   "tagline": "China, clara. 让拉美读懂中国，让好工厂被看见。"
 }

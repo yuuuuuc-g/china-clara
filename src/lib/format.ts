@@ -17,3 +17,17 @@ export function formatDate(value: string | null | undefined, locale: Locale): st
     day: "numeric",
   }).format(date);
 }
+
+/** 日期 + 时分（消息线程用）；无值返回空串。 */
+export function formatDateTime(value: string | null | undefined, locale: Locale): string {
+  if (!value) return "";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  return new Intl.DateTimeFormat(INTL_LOCALE[locale], {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(date);
+}

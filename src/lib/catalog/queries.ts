@@ -109,6 +109,62 @@ export async function listVerifiedSuppliers(opts: {
   return { items, total: count ?? items.length, page, perPage };
 }
 
+export interface ProductForInquiry {
+  id: string;
+  slug: string;
+  name: string;
+  moq: number | null;
+  supplierSlug: string | null;
+  supplierName: string | null;
+}
+
+/** 发起询盘页用：按 slug 取已发布商品（含供应商名，本地化）。 */
+export async function getPublishedProductBySlug(opts: {
+  lang: Locale;
+  slug: string;
+}): Promise<ProductForInquiry | null> {
+  if (!isConfigured()) return null;
+
+  const { data, error } = await serviceClient()
+    .schema("catalog")
+    .from("products")
+    .select(
+      "id, slug, moq, supplier:supplier_id (slug, company_name, company_name_en), translations:product_translations (lang, name)"
+    )
+    .eq("slug", opts.slug)
+    .eq("status", "published")
+    .maybeSingle();
+
+  if (error) {
+    console.error("[catalog.queries] getPublishedProductBySlug failed:", error.message);
+    return null;
+  }
+  if (!data) return null;
+
+  const row = data as unknown as {
+    id: string;
+    slug: string;
+    moq: number | null;
+    supplier: { slug: string; company_name: string; company_name_en: string | null } | null;
+    translations: { lang: string; name: string }[];
+  };
+  const byLang = new Map(row.translations.map((t) => [t.lang, t.name]));
+  const name = byLang.get(opts.lang) ?? byLang.get("zh") ?? row.translations[0]?.name ?? "";
+
+  return {
+    id: row.id,
+    slug: row.slug,
+    name,
+    moq: row.moq,
+    supplierSlug: row.supplier?.slug ?? null,
+    supplierName: row.supplier
+      ? opts.lang === "zh"
+        ? row.supplier.company_name
+        : row.supplier.company_name_en || row.supplier.company_name
+      : null,
+  };
+}
+
 export async function getSupplierBySlug(opts: {
   lang: Locale;
   slug: string;
