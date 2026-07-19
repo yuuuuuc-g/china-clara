@@ -20,6 +20,8 @@ const eslintConfig = defineConfig([
     "rag-pipeline/**",
     ".scratch/**",
     ".sisyphus/run-continuation/**",
+    // GitNexus 本地索引产物（git 已忽略，lint 也应忽略）：
+    ".gitnexus/**",
   ]),
 ]);
 

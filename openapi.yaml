@@ -28,9 +28,28 @@ paths:
         - { name: page, in: query, schema: { type: integer, minimum: 1, default: 1 } }
       responses:
         "200": { $ref: "#/components/responses/Envelope" }
+  /catalog/suppliers:
+    get:
+      summary: 已验证供应商列表（公开）
+      parameters:
+        - { name: lang, in: query, schema: { type: string, enum: [es, en, zh], default: es } }
+        - { name: page, in: query, schema: { type: integer, minimum: 1, default: 1 } }
+        - { name: per_page, in: query, schema: { type: integer, maximum: 50, default: 20 } }
+      responses:
+        "200": { $ref: "#/components/responses/Envelope" }
   /inquiries:
+    get:
+      summary: 我的询盘列表（scope inquiries:read；身份 = PAT 所有者）
+      security: [{ pat: [] }]
+      parameters:
+        - { name: lang, in: query, schema: { type: string, enum: [es, en, zh], default: es } }
+        - { name: page, in: query, schema: { type: integer, minimum: 1, default: 1 } }
+        - { name: per_page, in: query, schema: { type: integer, maximum: 50, default: 20 } }
+      responses:
+        "200": { $ref: "#/components/responses/Envelope" }
+        "401": { $ref: "#/components/responses/Envelope" }
     post:
-      summary: 发起询盘（scope inquiries:write）
+      summary: 发起询盘（scope inquiries:write；买家 = PAT 所有者）
       security: [{ pat: [] }]
       requestBody:
         required: true
@@ -38,16 +57,69 @@ paths:
           application/json:
             schema:
               type: object
-              required: [product_id, quantity, message, buyer_profile_id]
+              required: [product_id, quantity, message]
               properties:
                 product_id: { type: string, format: uuid }
                 quantity: { type: integer, minimum: 1 }
                 target_port: { type: string }
-                message: { type: string, minLength: 10 }
-                buyer_profile_id: { type: string, format: uuid }
+                message: { type: string, minLength: 10, maxLength: 5000 }
       responses:
         "201": { $ref: "#/components/responses/Envelope" }
         "401": { $ref: "#/components/responses/Envelope" }
+        "404": { $ref: "#/components/responses/Envelope" }
+        "422": { $ref: "#/components/responses/Envelope" }
+  /inquiries/{id}:
+    get:
+      summary: 询盘详情 + 消息线程（scope inquiries:read；仅当事双方）
+      security: [{ pat: [] }]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+        - { name: lang, in: query, schema: { type: string, enum: [es, en, zh], default: es } }
+      responses:
+        "200": { $ref: "#/components/responses/Envelope" }
+        "401": { $ref: "#/components/responses/Envelope" }
+        "404": { $ref: "#/components/responses/Envelope" }
+  /inquiries/{id}/messages/{messageId}/translate:
+    post:
+      summary: 消息一键翻译（scope inquiries:read；仅当事双方；译文缓存在消息上）
+      security: [{ pat: [] }]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+        - { name: messageId, in: path, required: true, schema: { type: string, format: uuid } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [target_lang]
+              properties:
+                target_lang: { type: string, enum: [es, en, zh] }
+      responses:
+        "200": { $ref: "#/components/responses/Envelope" }
+        "401": { $ref: "#/components/responses/Envelope" }
+        "404": { $ref: "#/components/responses/Envelope" }
+        "422": { $ref: "#/components/responses/Envelope" }
+        "503": { $ref: "#/components/responses/Envelope" }
+  /inquiries/{id}/messages:
+    post:
+      summary: 在询盘下发消息（scope inquiries:write；发送者 = PAT 所有者）
+      security: [{ pat: [] }]
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [body]
+              properties:
+                body: { type: string, minLength: 1, maxLength: 5000 }
+      responses:
+        "201": { $ref: "#/components/responses/Envelope" }
+        "401": { $ref: "#/components/responses/Envelope" }
+        "404": { $ref: "#/components/responses/Envelope" }
         "422": { $ref: "#/components/responses/Envelope" }
 components:
   securitySchemes:

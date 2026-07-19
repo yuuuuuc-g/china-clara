@@ -19,6 +19,8 @@ export type Scope = (typeof SCOPES)[number];
 export interface AuthResult {
   ok: boolean;
   tokenId?: string;
+  /** token 所有者的 crm.profiles.id：写操作的身份来源（不信任请求体里的 profile id）。 */
+  ownerProfileId?: string;
   scopes?: Scope[];
   reason?: string;
 }
@@ -37,7 +39,7 @@ export async function authenticatePat(
   const { data, error } = await serviceClient()
     .schema("crm")
     .from("api_tokens")
-    .select("id, scopes, revoked_at, expires_at")
+    .select("id, owner_profile_id, scopes, revoked_at, expires_at")
     .eq("token_hash", hash)
     .maybeSingle();
 
@@ -50,5 +52,10 @@ export async function authenticatePat(
   if (!scopes.includes(requiredScope)) {
     return { ok: false, reason: "insufficient_scope" };
   }
-  return { ok: true, tokenId: data.id as string, scopes };
+  return {
+    ok: true,
+    tokenId: data.id as string,
+    ownerProfileId: data.owner_profile_id as string,
+    scopes,
+  };
 }
