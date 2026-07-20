@@ -113,6 +113,13 @@ export interface Dictionary {
     submit: string;
     submittedNotice: string;
     reviewNotice: string;
+    /** 帖子互动：点赞与评论。 */
+    like: string;
+    comments: string;
+    commentsEmpty: string;
+    commentPlaceholder: string;
+    commentSubmit: string;
+    loginToInteract: string;
   };
   tagline: string;
 }

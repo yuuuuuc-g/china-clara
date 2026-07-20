@@ -108,7 +108,13 @@
     "postBody": "Contenido (Markdown)",
     "submit": "Enviar a revisión",
     "submittedNotice": "¡Gracias! Tu publicación está en revisión y aparecerá pronto.",
-    "reviewNotice": "Las publicaciones pasan por una revisión editorial antes de aparecer."
+    "reviewNotice": "Las publicaciones pasan por una revisión editorial antes de aparecer.",
+    "like": "Me gusta",
+    "comments": "Comentarios",
+    "commentsEmpty": "Aún no hay comentarios. Sé el primero en opinar.",
+    "commentPlaceholder": "Comparte tu experiencia o pregunta…",
+    "commentSubmit": "Comentar",
+    "loginToInteract": "Inicia sesión para dar me gusta y comentar."
   },
   "tagline": "China, clara. Tu primera parada para entender China y encontrar proveedores confiables."
 }

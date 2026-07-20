@@ -108,7 +108,13 @@
     "postBody": "正文（Markdown）",
     "submit": "提交审核",
     "submittedNotice": "已提交！审核通过后即会展示。",
-    "reviewNotice": "文章需经编辑审核后才会公开展示。"
+    "reviewNotice": "文章需经编辑审核后才会公开展示。",
+    "like": "点赞",
+    "comments": "评论",
+    "commentsEmpty": "还没有评论，来说两句吧。",
+    "commentPlaceholder": "分享你的经验或提问…",
+    "commentSubmit": "发表评论",
+    "loginToInteract": "登录后即可点赞和评论。"
   },
   "tagline": "China, clara. 让拉美读懂中国，让好工厂被看见。"
 }
