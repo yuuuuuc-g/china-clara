@@ -23,8 +23,9 @@
 - 认证：终端用户 Supabase Auth JWT；外部项目 PAT（`Authorization: Bearer pat_...`），
   scope 白名单见 `src/lib/api/auth.ts`。
 - OpenAPI spec 在 `openapi.yaml`，改接口必须同步改 spec。
-- 新代码用 `src/lib/supabase/service.ts`（四域 untyped client）；
-  旧 `src/lib/supabase/admin.ts` 绑定旧 database.types，仅供 legacy 模块过渡使用。
+- 数据库访问统一走 `src/lib/supabase/service.ts`（四域 untyped client）。
+  各域查询层放 `src/lib/<域>/`（如 `crm/inquiries.ts`、`content/intel.ts`、`moderation/queries.ts`）。
+  旧 `admin.ts` + `database.types.ts` 已随 legacy 模块删除；需类型时跑 `npm run supabase:types` 重新生成。
 
 ## 数据库迁移流程
 
@@ -36,17 +37,18 @@
 ## Legacy 处置清单（原地重建过渡期）
 
 **保留并复用**：
-- `src/components/canvas/` + `src/modules/canvas/` — 3D 门户（待改造：行星 → 读懂中国/情报/供应商/询盘/社区/API）
-- `src/modules/intelligence/` + `config/intelligence-sources.json` + `app/api/cron/intelligence-ingest` — 情报管线（待改造：信息源换成中拉贸易源，落表到 content 域）
-- `src/modules/ai/provider-adapter.ts` — 改造为西/英翻译管线
-- `src/modules/rag/`、`src/modules/retrieval/` — 读懂中国站内问答
+- `src/components/canvas/` + `src/modules/canvas/` — 3D 门户（待改造：行星 → 读懂中国/情报/供应商/询盘/社区/API）。
+- `src/modules/ai/provider-adapter.ts` — 翻译管线底座，被 `src/lib/crm/translate.ts` 与 `src/lib/content/translate-articles.ts` 消费。
 
-**待删除（确认无引用后分批清理，勿一次性删）**：
-- `src/modules/{archive,refinery,galaxy-shell,social-signals}` 及对应 HUD 组件
-- `app/{archive,exocortex,knowledge-graph,analytical-pipeline}` 页面
-- `app/api/{archive,chat,nodes,search,topics,macro-intel,macro-raw-articles,social-signals,apac-supply-chain,analytical-pipeline,cron/fetch-news,cron/x-signals-ingest}`
-- `ingest.py`、`rag-pipeline/`、`requirements.txt`、`__pycache__`（Python 侧按需保留）
-- `src/lib/database.types.ts` 在新项目 types 生成后整体替换
+**已清理（`claude/legacy-cleanup` 分支）**：
+TS legacy 全部删除，仅剩 `src/modules/{ai,canvas}`。
+移除清单：`src/modules/{archive,refinery,galaxy-shell,social-signals,intelligence,rag,retrieval}`、对应 `app/*` 与 `app/api/*` 页面路由（含 `intelligence-ingest-status`）、`src/lib/{apac-supply-chain,ai-domain-events,local-search,export-utils,database.types}.ts`、`src/lib/supabase/admin.ts`、旧 `config/intelligence-sources.json`。
+情报管线已重写为 `src/lib/content/intel-ingest.ts`（中拉贸易源 `config/intelligence-sources-latam.json`，落 content 域）。
+
+**待处理（可选，需人工确认后再动）**：
+- `ingest.py`、`rag-pipeline/`、`requirements.txt`、`tests/test_ingest.py` — Python RAG 侧。
+  原注「按需保留」；其 TS 消费方（`modules/rag,retrieval`）已删。
+  若不重建「读懂中国站内问答」，可整体清理。
 
 ## 质量门禁（提交前必须全绿）
 
@@ -57,7 +59,7 @@ npm test && npx tsc --noEmit && npm run lint && npm run build
 <!-- gitnexus:start -->
 # GitNexus — Code Intelligence
 
-This project is indexed by GitNexus as **china-clara** (1263 symbols, 2775 relationships, 100 execution flows). Use the GitNexus MCP tools to understand code, assess impact, and navigate safely.
+This project is indexed by GitNexus as **china-clara** (893 symbols, 1945 relationships, 68 execution flows). Use the GitNexus MCP tools to understand code, assess impact, and navigate safely.
 
 > Index stale? Run `node .gitnexus/run.cjs analyze` from the project root — it auto-selects an available runner. No `.gitnexus/run.cjs` yet? `npx gitnexus analyze` (npm 11 crash → `npm i -g gitnexus`; #1939).
 
