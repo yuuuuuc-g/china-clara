@@ -108,7 +108,13 @@
     "postBody": "Content (Markdown)",
     "submit": "Submit for review",
     "submittedNotice": "Thanks! Your post is under review and will appear soon.",
-    "reviewNotice": "Posts go through editorial review before they appear."
+    "reviewNotice": "Posts go through editorial review before they appear.",
+    "like": "Like",
+    "comments": "Comments",
+    "commentsEmpty": "No comments yet. Be the first to weigh in.",
+    "commentPlaceholder": "Share your experience or ask a question…",
+    "commentSubmit": "Comment",
+    "loginToInteract": "Sign in to like and comment."
   },
   "tagline": "China, clara. Your first stop to understand China and find trusted suppliers."
 }

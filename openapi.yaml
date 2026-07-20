@@ -71,6 +71,33 @@ paths:
       responses:
         "200": { $ref: "#/components/responses/Envelope" }
         "404": { $ref: "#/components/responses/Envelope" }
+  /community/posts/{slug}/comments:
+    get:
+      summary: 帖子评论列表（公开，时间升序，最多 100 条）
+      parameters:
+        - { name: slug, in: path, required: true, schema: { type: string } }
+      responses:
+        "200": { $ref: "#/components/responses/Envelope" }
+        "404": { $ref: "#/components/responses/Envelope" }
+    post:
+      summary: 发表评论（scope community:write；作者 = PAT 所有者；仅已发布帖）
+      security: [{ pat: [] }]
+      parameters:
+        - { name: slug, in: path, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [body]
+              properties:
+                body: { type: string, minLength: 2, maxLength: 2000 }
+      responses:
+        "201": { $ref: "#/components/responses/Envelope" }
+        "401": { $ref: "#/components/responses/Envelope" }
+        "404": { $ref: "#/components/responses/Envelope" }
+        "422": { $ref: "#/components/responses/Envelope" }
   /inquiries:
     get:
       summary: 我的询盘列表（scope inquiries:read；身份 = PAT 所有者；role=supplier 时为名下供应商收件箱）
